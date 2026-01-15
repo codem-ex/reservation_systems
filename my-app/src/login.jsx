@@ -1,41 +1,90 @@
 import React, { useState } from 'react';
-import { supabase } from './supabaseClient'; // เรียกใช้ตัวแปรที่สร้างไว้
+import { supabase } from './supabaseClient';
+import { saveLog, downloadLogs } from './logger';
 import './auth.css';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState('');
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        setLoading(true);
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        saveLog('LOGIN_ATTEMPT', { email });
 
-        if (error) setMessage(`Error: ${error.message}`);
-        else setMessage('เข้าสู่ระบบสำเร็จ!');
-        setLoading(false);
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+
+        if (error) {
+            saveLog('LOGIN_ERROR', error);
+            alert(error.message);
+        } else {
+            saveLog('LOGIN_SUCCESS', data.user?.id);
+            // ❌ ไม่ navigate
+        }
+    };
+
+    const handleGoogleLogin = async () => {
+        saveLog('GOOGLE_LOGIN_START', {});
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                queryParams: {
+                    hd: 'chandra.ac.th',
+                    prompt: 'select_account',
+                },
+                redirectTo: window.location.origin, // ⭐ สำคัญ
+            },
+        });
+
+        if (error) saveLog('GOOGLE_ERROR', error);
     };
 
     return (
         <div className="auth-container">
             <div className="auth-card">
-                <h2 className="auth-title">เข้าสู่ระบบ</h2>
+                <h2 className="auth-title">Login</h2>
+
                 <form onSubmit={handleLogin}>
-                    <div className="form-group">
-                        <label className="label">อีเมล</label>
-                        <input className="input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-                    </div>
-                    <div className="form-group">
-                        <label className="label">รหัสผ่าน</label>
-                        <input className="input" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-                    </div>
-                    <button className="auth-btn" type="submit" disabled={loading}>
-                        {loading ? 'กำลังเข้าสู่ระบบ...' : 'Login'}
+                    <input
+                        className="input"
+                        type="email"
+                        placeholder="Email"
+                        required
+                        onChange={(e) => setEmail(e.target.value)}
+                    />
+                    <input
+                        className="input"
+                        type="password"
+                        placeholder="Password"
+                        required
+                        onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button className="auth-btn" type="submit">
+                        Login
                     </button>
                 </form>
-                {message && <div className={`alert ${message.includes('Error') ? 'alert-error' : 'alert-success'}`}>{message}</div>}
+
+                <div className="divider">หรือ</div>
+
+                <button onClick={handleGoogleLogin} className="google-btn" type="button">
+                    Login with Google
+                </button>
+
+                <button
+                    onClick={downloadLogs}
+                    style={{
+                        marginTop: '20px',
+                        fontSize: '12px',
+                        color: 'blue',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                    }}
+                >
+                    📥 ดาวน์โหลด Log ไฟล์เพื่อส่งตรวจสอบ
+                </button>
             </div>
         </div>
     );
