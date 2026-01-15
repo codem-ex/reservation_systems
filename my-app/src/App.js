@@ -4,6 +4,10 @@ import { supabase } from './supabaseClient';
 import LoginPage from './login';
 import EditProfilePage from './EditProfilePage';
 import RegisterPage from './register';
+import ReservationFormPage from './ReservationFormPage';
+import AdminApproverPage from './AdminApproverPage';
+import AddMeetingRoomPage from './AddMeetingRoomPage';
+import MeetingRoomsListPage from './MeetingRoomsListPage';
 
 function App() {
   const [session, setSession] = useState(null);
@@ -40,6 +44,22 @@ function App() {
         <Route
           path="/register"
           element={!session ? <RegisterPage /> : <Navigate to="/edit-profile" />}
+        />
+        <Route
+          path="/reservation-form"
+          element={session ? <ReservationFormPage session={session} /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/admin/approvers"
+          element={session ? <AdminApproverPage /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/admin/add-room"
+          element={session ? <AddMeetingRoomPage /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/rooms"
+          element={session ? <MeetingRoomsListPage /> : <Navigate to="/login" />}
         />
         <Route path="/" element={<Navigate to="/login" />} />
       </Routes>
