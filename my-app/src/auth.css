@@ -122,3 +122,51 @@
     color: #166534;
     border: 1px solid #bbf7d0;
 }
+
+/* ส่วนเดิมที่เคยให้ไว้ และเพิ่มส่วนนี้เข้าไป */
+.divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 1.5rem 0;
+    color: #9ca3af;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #d1d5db;
+}
+
+.divider:not(:empty)::before {
+    margin-right: .5em;
+}
+
+.divider:not(:empty)::after {
+    margin-left: .5em;
+}
+
+.google-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background-color: white;
+    color: #374151;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.google-btn:hover {
+    background-color: #f9fafb;
+}
+
+.google-btn img {
+    width: 18px;
+}
