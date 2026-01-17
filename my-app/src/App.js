@@ -8,6 +8,7 @@ import ReservationFormPage from './ReservationFormPage';
 import AdminApproverPage from './AdminApproverPage';
 import AddMeetingRoomPage from './AddMeetingRoomPage';
 import MeetingRoomsListPage from './MeetingRoomsListPage';
+import ReservationCalendarPage from './ReservationCalendarPage';
 
 function App() {
   const [session, setSession] = useState(null);
@@ -61,6 +62,11 @@ function App() {
           path="/rooms"
           element={session ? <MeetingRoomsListPage /> : <Navigate to="/login" />}
         />
+        <Route
+          path="/reserve-calendar"
+          element={session ? <ReservationCalendarPage /> : <Navigate to="/login" />}
+        />
+
         <Route path="/" element={<Navigate to="/login" />} />
       </Routes>
     </BrowserRouter>
