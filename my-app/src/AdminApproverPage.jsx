@@ -10,38 +10,58 @@ const AdminApproverPage = () => {
 
     const [session, setSession] = useState(null);
 
-    const [users, setUsers] = useState([]);       // profiles ทั้งหมด
-    const [approvers, setApprovers] = useState([]); // approver_info ทั้งหมด
-    const [q, setQ] = useState('');
+    const [users, setUsers] = useState([]);          // มาจาก backend (auth.users + profiles)
+    const [approvers, setApprovers] = useState([]);  // มาจาก backend (approver_info)
 
+    const [q, setQ] = useState('');
     const [selectedUser, setSelectedUser] = useState(null);
     const [approvPos, setApprovPos] = useState('');
 
-    const loadAll = async () => {
-        // โหลด users จาก profiles
-        const { data: userRows, error: userErr } = await supabase
-            .from('profiles')
-            .select('id, first_name, last_name, email')
-            .order('first_name', { ascending: true });
+    const apiFetch = async (path, options = {}) => {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
 
-        if (userErr) {
-            alert(`โหลดรายชื่อผู้ใช้ไม่สำเร็จ: ${userErr.message}`);
-            setUsers([]);
-        } else {
-            setUsers(userRows || []);
+        if (!token) {
+            navigate('/login');
+            throw new Error('No session token');
         }
 
-        // โหลด approvers จาก approver_info
-        const { data: approverRows, error: approverErr } = await supabase
-            .from('approver_info')
-            .select('user_id, approv_name, approv_pos')
-            .order('approv_name', { ascending: true });
+        const res = await fetch(path, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+                ...(options.headers || {}),
+            },
+        });
 
-        if (approverErr) {
-            // ถ้า policy ไม่ให้ select อาจขึ้น RLS (ให้คุณตั้ง policy แอดมิน)
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+            const msg = data?.message || data?.error || res.statusText;
+            throw new Error(msg);
+        }
+
+        return data;
+    };
+
+    const loadAll = async () => {
+        // 1) users จาก backend
+        try {
+            const u = await apiFetch('/api/admin/users');
+            setUsers(u.users || []);
+        } catch (err) {
+            alert(`โหลดรายชื่อผู้ใช้ไม่สำเร็จ: ${err.message}`);
+            setUsers([]);
+        }
+
+        // 2) approvers จาก backend
+        try {
+            const a = await apiFetch('/api/admin/approvers');
+            setApprovers(a.approvers || []);
+        } catch (err) {
+            // ถ้าไม่ใช่ admin จะโดน 403
             setApprovers([]);
-        } else {
-            setApprovers(approverRows || []);
         }
     };
 
@@ -53,11 +73,6 @@ const AdminApproverPage = () => {
                 return;
             }
             setSession(session);
-
-            // 🔒 (optional) จุดตรวจสอบสิทธิ์แอดมิน
-            // ถ้าคุณมี is_admin ใน user_info ให้เปิดใช้บล็อคนี้
-            // const { data: ui } = await supabase.from('user_info').select('is_admin').eq('id', session.user.id).single();
-            // if (!ui?.is_admin) { alert('คุณไม่มีสิทธิ์เข้าหน้านี้'); navigate('/edit-profile'); return; }
 
             await loadAll();
             setLoading(false);
@@ -79,15 +94,14 @@ const AdminApproverPage = () => {
 
         return users.filter((u) => {
             const full = `${u.first_name || ''} ${u.last_name || ''}`.trim().toLowerCase();
+            const display = (u.display_name || '').toLowerCase();
             const email = (u.email || '').toLowerCase();
-            return full.includes(needle) || email.includes(needle);
+            return full.includes(needle) || email.includes(needle) || display.includes(needle);
         });
     }, [q, users]);
 
     const pickUser = (u) => {
         setSelectedUser(u);
-
-        // ถ้าเคยเป็น approver อยู่แล้ว ให้เติมตำแหน่งเดิมมาให้แก้ได้
         const existing = approverMap.get(u.id);
         setApprovPos(existing?.approv_pos || '');
     };
@@ -102,47 +116,43 @@ const AdminApproverPage = () => {
 
         const approvName =
             `${selectedUser.first_name || ''} ${selectedUser.last_name || ''}`.trim()
+            || selectedUser.display_name
             || selectedUser.email
             || '(ไม่พบชื่อ)';
 
         setSaving(true);
 
-        // ✅ สำคัญ: ใช้ user_id ตาม FK ที่ชี้ไป profiles(id)
-        const { error } = await supabase
-            .from('approver_info')
-            .upsert(
-                {
+        try {
+            await apiFetch('/api/admin/approvers/upsert', {
+                method: 'POST',
+                body: JSON.stringify({
                     user_id: selectedUser.id,
                     approv_name: approvName,
                     approv_pos: approvPos.trim(),
-                },
-                { onConflict: 'user_id' }
-            );
+                }),
+            });
 
-        if (error) {
-            alert(`ตั้ง approver ไม่สำเร็จ: ${error.message}`);
-        } else {
             alert('ตั้งเป็น approver เรียบร้อย');
             setSelectedUser(null);
             setApprovPos('');
-            await loadAll(); // refresh list
+            await loadAll();
+        } catch (err) {
+            alert(`ตั้ง approver ไม่สำเร็จ: ${err.message}`);
         }
 
         setSaving(false);
     };
 
     const handleRemoveApprover = async (userId) => {
-        if (!window.confirm('ต้องการยกเลิกสิทธิ์ approver ของผู้ใช้นี้ใช่ไหม?')) return;
+        const ok = window.confirm('ต้องการยกเลิกสิทธิ์ approver ของผู้ใช้นี้ใช่ไหม?');
+        if (!ok) return;
 
-        const { error } = await supabase
-            .from('approver_info')
-            .delete()
-            .eq('user_id', userId);
-
-        if (error) alert(`ลบ approver ไม่สำเร็จ: ${error.message}`);
-        else {
+        try {
+            await apiFetch(`/api/admin/approvers/${userId}`, { method: 'DELETE' });
             alert('ยกเลิก approver แล้ว');
             await loadAll();
+        } catch (err) {
+            alert(`ลบ approver ไม่สำเร็จ: ${err.message}`);
         }
     };
 
@@ -168,7 +178,11 @@ const AdminApproverPage = () => {
 
                 <div style={{ marginTop: 6 }}>
                     {filteredUsers.map((u) => {
-                        const fullName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || '(ไม่มีชื่อ)';
+                        const fullName =
+                            `${u.first_name || ''} ${u.last_name || ''}`.trim()
+                            || u.display_name
+                            || '(ไม่มีชื่อ)';
+
                         const isApprover = approverMap.has(u.id);
 
                         return (
@@ -234,6 +248,7 @@ const AdminApproverPage = () => {
                             ผู้ใช้ที่เลือก:{' '}
                             <b>
                                 {`${selectedUser.first_name || ''} ${selectedUser.last_name || ''}`.trim()
+                                    || selectedUser.display_name
                                     || selectedUser.email
                                     || '(ไม่พบชื่อ)'}
                             </b>

@@ -9,6 +9,10 @@ import AdminApproverPage from './AdminApproverPage';
 import AddMeetingRoomPage from './AddMeetingRoomPage';
 import MeetingRoomsListPage from './MeetingRoomsListPage';
 import ReservationCalendarPage from './ReservationCalendarPage';
+import MyReservationsPage from './MyReservationsPage';
+import ReservationDetailPage from './ReservationDetailPage';
+import ApproverDashboardPage from './ApproverDashboardPage';
+import DevHomePage from './DevHomePage';
 
 function App() {
   const [session, setSession] = useState(null);
@@ -65,6 +69,22 @@ function App() {
         <Route
           path="/reserve-calendar"
           element={session ? <ReservationCalendarPage /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/my-reservations"
+          element={session ? <MyReservationsPage /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/reservation/:reservId"
+          element={session ? <ReservationDetailPage /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/approver"
+          element={session ? <ApproverDashboardPage /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/dev"
+          element={session ? <DevHomePage /> : <Navigate to="/login" />}
         />
 
         <Route path="/" element={<Navigate to="/login" />} />

@@ -2,120 +2,94 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
-const CONFIG = {
-    RESERVATION_TABLE: 'reservation_info',
-    ROOM_TABLE: 'meeting_rooms',   // ✅ ใช้ meeting_rooms ตามที่คุณบอก
-    ROOM_ID_COL: 'room_id',
-    ROOM_LABEL_COL: 'room_name',
-};
-
 const ReservationFormPage = () => {
     const navigate = useNavigate();
-
-    const [session, setSession] = useState(null);
-    const [displayName, setDisplayName] = useState('');
-    const [rooms, setRooms] = useState([]);
+    const API_BASE = window.location.origin;
 
     const [loading, setLoading] = useState(true);
+    const [rooms, setRooms] = useState([]);
+
+    const [roomId, setRoomId] = useState('');
+    const [reservStart, setReservStart] = useState('');
+    const [reservEnd, setReservEnd] = useState('');
+    const [reservPurp, setReservPurp] = useState('');
+
     const [saving, setSaving] = useState(false);
 
-    const [form, setForm] = useState({
-        room_id: '',
-        reserv_start: '',
-        reserv_end: '',
-        reserv_purp: '',
-    });
+    const loadRooms = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            navigate('/login');
+            return;
+        }
+
+        // meeting_rooms ใช้ room_id
+        const { data, error } = await supabase
+            .from('meeting_rooms')
+            .select('room_id, room_name')
+            .order('room_name', { ascending: true });
+
+        if (error) {
+            alert(`โหลดรายการห้องไม่สำเร็จ: ${error.message}`);
+            setRooms([]);
+        } else {
+            setRooms(data || []);
+            if ((data || []).length > 0) setRoomId(data[0].room_id);
+        }
+    };
 
     useEffect(() => {
         const init = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                navigate('/login');
-                return;
-            }
-            setSession(session);
-
-            // ชื่อผู้จอง (profiles ก่อน)
-            const { data: p } = await supabase
-                .from('profiles')
-                .select('first_name, last_name')
-                .eq('id', session.user.id)
-                .single();
-
-            const fullFromProfile =
-                p?.first_name ? `${p.first_name}${p?.last_name ? ` ${p.last_name}` : ''}` : '';
-            const fullFromMeta = session.user.user_metadata?.full_name || '';
-            const fallback = session.user.email || '';
-            setDisplayName(fullFromProfile || fullFromMeta || fallback);
-
-            // โหลดรายการห้องจาก meeting_rooms
-            const { data: roomList, error: roomErr } = await supabase
-                .from(CONFIG.ROOM_TABLE)
-                .select(`${CONFIG.ROOM_ID_COL}, ${CONFIG.ROOM_LABEL_COL}`)
-                .order(CONFIG.ROOM_LABEL_COL, { ascending: true });
-
-            if (roomErr) {
-                alert(`โหลดรายการห้องไม่สำเร็จ: ${roomErr.message}`);
-                setRooms([]);
-            } else {
-                setRooms(roomList || []);
-            }
-
+            await loadRooms();
             setLoading(false);
         };
-
         init();
-    }, [navigate]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setForm((prev) => ({ ...prev, [name]: value }));
-    };
-
-    const handleSubmit = async (e) => {
+    const submit = async (e) => {
         e.preventDefault();
-        if (!session) return;
 
-        if (rooms.length === 0) {
-            alert('ยังไม่มีข้อมูลห้องประชุมในระบบ กรุณาให้ผู้ดูแลเพิ่มห้องก่อน');
-            return;
-        }
-        if (!form.room_id) {
-            alert('กรุณาเลือกห้องประชุม');
-            return;
-        }
-        if (!form.reserv_start || !form.reserv_end) {
-            alert('กรุณาเลือกวันเริ่มจองและวันสิ้นสุดการจอง');
-            return;
-        }
-        if (new Date(form.reserv_end) < new Date(form.reserv_start)) {
-            alert('วันสิ้นสุดการจองต้องไม่ก่อนวันเริ่มจอง');
-            return;
-        }
-        if (!form.reserv_purp.trim()) {
-            alert('กรุณากรอกเหตุผลในการจอง');
-            return;
-        }
+        if (!roomId) return alert('กรุณาเลือกห้อง');
+        if (!reservStart) return alert('กรุณาเลือกวันเริ่มจอง');
+        if (!reservEnd) return alert('กรุณาเลือกวันสิ้นสุด');
+        if (!reservPurp.trim()) return alert('กรุณากรอกเหตุผล');
 
         setSaving(true);
 
-        const payload = {
-            room_id: form.room_id,
-            reserv_start: form.reserv_start,
-            reserv_end: form.reserv_end,
-            reserv_purp: form.reserv_purp.trim(),
-            who_reserv_id: session.user.id,
-        };
+        try {
+            const { data: sessData } = await supabase.auth.getSession();
+            const token = sessData?.session?.access_token;
+            if (!token) throw new Error('ไม่พบ access token (กรุณา login ใหม่)');
 
-        const { error } = await supabase
-            .from(CONFIG.RESERVATION_TABLE)
-            .insert(payload);
+            const resp = await fetch(`${API_BASE}/api/reservations/create`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    room_id: roomId,
+                    reserv_start: reservStart,
+                    reserv_end: reservEnd,
+                    reserv_purp: reservPurp.trim(),
+                }),
+            });
 
-        if (error) {
-            alert(error.message);
-        } else {
-            alert('ส่งคำขอจองเรียบร้อย');
-            setForm({ room_id: '', reserv_start: '', reserv_end: '', reserv_purp: '' });
+            const json = await resp.json().catch(() => null);
+            if (!resp.ok || !json?.ok) {
+                throw new Error(json?.message || `HTTP ${resp.status}`);
+            }
+
+            alert('จองสำเร็จ');
+            // ไปหน้า detail ใบจองได้เลยถ้ามี route นี้
+            if (json?.reservation?.reserv_id) {
+                navigate(`/reservation/${json.reservation.reserv_id}`);
+            } else {
+                navigate('/my-reservations');
+            }
+        } catch (err) {
+            alert(`จองไม่สำเร็จ: ${err?.message || String(err)}`);
         }
 
         setSaving(false);
@@ -125,70 +99,52 @@ const ReservationFormPage = () => {
 
     return (
         <div className="auth-container">
-            <div className="auth-card">
+            <div className="auth-card" style={{ maxWidth: 780 }}>
                 <h2 className="auth-title">จองห้องประชุม</h2>
 
-                {rooms.length === 0 && (
-                    <p style={{ color: '#b45309', marginBottom: 12 }}>
-                        ยังไม่มีข้อมูลห้องประชุมในระบบ (เพิ่มข้อมูลใน public.meeting_rooms ก่อน)
-                    </p>
+                {rooms.length === 0 ? (
+                    <p>ยังไม่มีข้อมูลห้องประชุมในระบบ (เพิ่มข้อมูลใน public.meeting_rooms ก่อน)</p>
+                ) : (
+                    <form onSubmit={submit}>
+                        <label>เลือกห้อง</label>
+                        <select className="input" value={roomId} onChange={(e) => setRoomId(e.target.value)}>
+                            {rooms.map((r) => (
+                                <option key={r.room_id} value={r.room_id}>
+                                    {r.room_name}
+                                </option>
+                            ))}
+                        </select>
+
+                        <label>วันเริ่มจอง</label>
+                        <input
+                            className="input"
+                            type="datetime-local"
+                            value={reservStart}
+                            onChange={(e) => setReservStart(e.target.value)}
+                        />
+
+                        <label>วันสิ้นสุดการจอง</label>
+                        <input
+                            className="input"
+                            type="datetime-local"
+                            value={reservEnd}
+                            onChange={(e) => setReservEnd(e.target.value)}
+                        />
+
+                        <label>เหตุผลในการจอง</label>
+                        <textarea
+                            className="input"
+                            rows={4}
+                            value={reservPurp}
+                            onChange={(e) => setReservPurp(e.target.value)}
+                            placeholder="ระบุเหตุผล..."
+                        />
+
+                        <button className="auth-btn" type="submit" disabled={saving}>
+                            {saving ? 'กำลังบันทึก...' : 'บันทึกการจอง'}
+                        </button>
+                    </form>
                 )}
-
-                <form onSubmit={handleSubmit}>
-                    <label>ผู้จอง</label>
-                    <input className="input" value={displayName} disabled />
-
-                    <label>เลือกห้องประชุม</label>
-                    <select
-                        className="input"
-                        name="room_id"
-                        value={form.room_id}
-                        onChange={handleChange}
-                        required
-                        disabled={rooms.length === 0}
-                    >
-                        <option value="">-- เลือกห้อง --</option>
-                        {rooms.map((r) => (
-                            <option key={r[CONFIG.ROOM_ID_COL]} value={r[CONFIG.ROOM_ID_COL]}>
-                                {r[CONFIG.ROOM_LABEL_COL]}
-                            </option>
-                        ))}
-                    </select>
-
-                    <label>วันเริ่มจอง</label>
-                    <input
-                        className="input"
-                        type="date"
-                        name="reserv_start"
-                        value={form.reserv_start}
-                        onChange={handleChange}
-                        required
-                    />
-
-                    <label>วันสิ้นสุดการจอง</label>
-                    <input
-                        className="input"
-                        type="date"
-                        name="reserv_end"
-                        value={form.reserv_end}
-                        onChange={handleChange}
-                        required
-                    />
-
-                    <label>เหตุผลในการจอง</label>
-                    <textarea
-                        className="input"
-                        name="reserv_purp"
-                        value={form.reserv_purp}
-                        onChange={handleChange}
-                        rows={3}
-                        required
-                    />
-
-                    <button className="auth-btn" type="submit" disabled={saving || rooms.length === 0}>
-                        {saving ? 'กำลังบันทึก...' : 'ยืนยันการจอง'}
-                    </button>
-                </form>
             </div>
         </div>
     );

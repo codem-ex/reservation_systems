@@ -1,19 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
 import { supabase } from './supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
-const API_BASE = 'http://localhost:4000'; // ✅ ให้ตรงกับ backend ที่รันอยู่
-
-function compareISO(a, b) {
-    if (a === b) return 0;
-    return a < b ? -1 : 1;
-}
-
 const ReservationCalendarPage = () => {
     const navigate = useNavigate();
+
+    // ✅ ใช้ .env ก่อน ถ้าไม่ตั้งให้ใช้โดเมนเดียว
+    const API_BASE = (process.env.REACT_APP_API_BASE || window.location.origin).replace(/\/$/, '');
+
+    const CLIENT_TZ = 'Asia/Bangkok';
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -22,18 +17,71 @@ const ReservationCalendarPage = () => {
     const [displayName, setDisplayName] = useState('');
 
     const [rooms, setRooms] = useState([]);
+    const [roomId, setRoomId] = useState('');
 
-    const [form, setForm] = useState({
-        room_id: '',
-        reserv_start: '',
-        reserv_end: '', // inclusive สำหรับ user
-        reserv_purp: '',
-    });
+    const [reservStart, setReservStart] = useState('');
+    const [reservEnd, setReservEnd] = useState('');
+    const [reservPurp, setReservPurp] = useState('');
 
-    const [pickStep, setPickStep] = useState(0); // 0=start, 1=end
+    const [errMsg, setErrMsg] = useState('');
+
+    // แปลงค่า datetime-local ("YYYY-MM-DDTHH:mm") -> ISO (UTC, มี Z) เพื่อให้ backend/GCAL ตีความชัดเจน
+    const toIsoUtc = (localDateTimeStr) => {
+        if (!localDateTimeStr) return null;
+        const d = new Date(localDateTimeStr); // browser จะ parse เป็น local time
+        if (Number.isNaN(d.getTime())) return null;
+        return d.toISOString();
+    };
+
+    const validate = useMemo(() => {
+        if (!roomId) return 'กรุณาเลือกห้อง';
+        if (!reservStart) return 'กรุณาเลือกวันเริ่มจอง';
+        if (!reservEnd) return 'กรุณาเลือกวันสิ้นสุด';
+        if (!reservPurp.trim()) return 'กรุณากรอกเหตุผลในการจอง';
+
+        const s = new Date(reservStart);
+        const e = new Date(reservEnd);
+        if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return 'รูปแบบวันที่ไม่ถูกต้อง';
+        if (e <= s) return 'วันสิ้นสุดต้องมากกว่าวันเริ่มจอง';
+        return '';
+    }, [roomId, reservStart, reservEnd, reservPurp]);
+
+    const loadRooms = async () => {
+        const { data, error } = await supabase
+            .from('meeting_rooms')
+            .select('room_id, room_name')
+            .order('room_name', { ascending: true });
+
+        if (error) throw new Error(`โหลดรายการห้องไม่สำเร็จ: ${error.message}`);
+
+        const list = data || [];
+        setRooms(list);
+
+        // ตั้งค่า default room ถ้ายังไม่เคยเลือก
+        if (list.length > 0 && !roomId) setRoomId(list[0].room_id);
+    };
+
+    const loadProfileName = async (userId) => {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, email')
+            .eq('id', userId)
+            .single();
+
+        if (error) {
+            setDisplayName('');
+            return;
+        }
+
+        const full = `${data?.first_name || ''} ${data?.last_name || ''}`.trim();
+        setDisplayName(full || data?.email || '');
+    };
 
     useEffect(() => {
         const init = async () => {
+            setLoading(true);
+            setErrMsg('');
+
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
                 navigate('/login');
@@ -41,138 +89,75 @@ const ReservationCalendarPage = () => {
             }
             setSession(session);
 
-            const { data: p } = await supabase
-                .from('profiles')
-                .select('first_name, last_name')
-                .eq('id', session.user.id)
-                .single();
-
-            const fullFromProfile =
-                p?.first_name ? `${p.first_name}${p?.last_name ? ` ${p.last_name}` : ''}` : '';
-            const fullFromMeta = session.user.user_metadata?.full_name || '';
-            const fallback = session.user.email || '';
-            setDisplayName(fullFromProfile || fullFromMeta || fallback);
-
-            const { data: roomRows, error: roomErr } = await supabase
-                .from('meeting_rooms')
-                .select('room_id, room_name')
-                .order('room_name', { ascending: true });
-
-            if (roomErr) {
-                alert(`โหลดรายการห้องไม่สำเร็จ: ${roomErr.message}`);
-                setRooms([]);
-            } else {
-                setRooms(roomRows || []);
+            try {
+                await Promise.all([loadRooms(), loadProfileName(session.user.id)]);
+            } catch (e) {
+                setErrMsg(e?.message || String(e));
             }
 
             setLoading(false);
         };
 
         init();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [navigate]);
 
-    const handleDateClick = (arg) => {
-        const clicked = arg.dateStr;
+    const submit = async (e) => {
+        e.preventDefault();
+        setErrMsg('');
 
-        if (pickStep === 0) {
-            setForm((prev) => ({ ...prev, reserv_start: clicked, reserv_end: '' }));
-            setPickStep(1);
+        if (!session) {
+            navigate('/login');
             return;
         }
 
-        if (pickStep === 1) {
-            const start = form.reserv_start;
-
-            let s = start;
-            let e = clicked;
-
-            if (!s) {
-                setForm((prev) => ({ ...prev, reserv_start: clicked, reserv_end: '' }));
-                setPickStep(1);
-                return;
-            }
-
-            if (compareISO(e, s) < 0) {
-                const tmp = s;
-                s = e;
-                e = tmp;
-            }
-
-            setForm((prev) => ({ ...prev, reserv_start: s, reserv_end: e }));
-            setPickStep(0);
+        const v = validate;
+        if (v) {
+            alert(v);
+            return;
         }
-    };
-
-    const selectionHint = useMemo(() => {
-        return pickStep === 0 ? 'คลิกเลือก “วันเริ่มจอง”' : 'คลิกเลือก “วันสิ้นสุดการจอง”';
-    }, [pickStep]);
-
-    const clearSelection = () => {
-        setForm((prev) => ({ ...prev, reserv_start: '', reserv_end: '' }));
-        setPickStep(0);
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        if (!session) return;
-
-        if (!form.room_id) return alert('กรุณาเลือกห้องประชุม');
-        if (!form.reserv_start || !form.reserv_end) return alert('กรุณาเลือกวันเริ่มและวันสิ้นสุดจากปฏิทิน');
-        if (!form.reserv_purp.trim()) return alert('กรุณากรอกเหตุผลในการจอง');
 
         setSaving(true);
 
         try {
-            const { data: sessData, error: sessErr } = await supabase.auth.getSession();
+            const { data: sessData } = await supabase.auth.getSession();
             const token = sessData?.session?.access_token;
-            if (sessErr || !token) throw new Error('ไม่พบ access token (กรุณา login ใหม่)');
+            if (!token) throw new Error('ไม่พบ access token (กรุณา login ใหม่)');
 
-            const url = `${API_BASE}/api/reservations/create`;
+            // แปลงเป็น ISO ชัดเจน (UTC) เพื่อให้ backend/Google Calendar parse ได้แน่นอน
+            const startIso = toIsoUtc(reservStart);
+            const endIso = toIsoUtc(reservEnd);
+            if (!startIso || !endIso) throw new Error('รูปแบบวันที่ไม่ถูกต้อง (แปลงเวลาไม่สำเร็จ)');
 
-            const resp = await fetch(url, {
+            const payload = {
+                room_id: roomId,
+                reserv_start: startIso,
+                reserv_end: endIso,
+                reserv_purp: reservPurp.trim(),
+                client_tz: CLIENT_TZ,
+            };
+
+            const resp = await fetch(`${API_BASE}/api/reservations/create`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({
-                    room_id: form.room_id,
-                    reserv_start: form.reserv_start,
-                    reserv_end_inclusive: form.reserv_end,
-                    reserv_purp: form.reserv_purp.trim(),
-                }),
+                body: JSON.stringify(payload),
             });
 
-            // ถ้า backend ไม่เจอ route/พอร์ตผิด มักเป็น 404 HTML
-            const text = await resp.text();
-            let json;
-            try {
-                json = JSON.parse(text);
-            } catch {
-                json = null;
+            const json = await resp.json().catch(() => null);
+            if (!resp.ok || !json?.ok) {
+                throw new Error(json?.message || `HTTP ${resp.status}`);
             }
 
-            if (!resp.ok) {
-                // แสดงรายละเอียดให้รู้ว่า 404 มาจากไหน
-                const detail = json?.message || text || `HTTP ${resp.status}`;
-                throw new Error(`HTTP ${resp.status} (${resp.statusText}): ${detail}`);
-            }
+            alert('จองสำเร็จ');
 
-            if (!json?.ok) {
-                throw new Error(json?.message || 'Unknown error');
-            }
-
-            alert('บันทึกการจองเรียบร้อย (DB + Google Calendar)');
-
-            if (json.htmlLink) {
-                window.open(json.htmlLink, '_blank', 'noopener,noreferrer');
-            }
-
-            setForm({ room_id: '', reserv_start: '', reserv_end: '', reserv_purp: '' });
-            setPickStep(0);
-        } catch (err) {
-            alert(`จองไม่สำเร็จ: ${err?.message || String(err)}\n\nเช็กด้วยว่า API_BASE ถูกไหม: ${API_BASE}`);
+            const reservId = json?.reservation?.reserv_id;
+            if (reservId) navigate(`/reservation/${reservId}`);
+            else navigate('/my-reservations');
+        } catch (e2) {
+            alert(`จองไม่สำเร็จ: ${e2?.message || String(e2)}`);
         }
 
         setSaving(false);
@@ -182,74 +167,76 @@ const ReservationCalendarPage = () => {
 
     return (
         <div className="auth-container">
-            <div className="auth-card" style={{ maxWidth: 1000 }}>
-                <h2 className="auth-title">จองห้องประชุม (DB + Google Calendar)</h2>
+            <div className="auth-card" style={{ maxWidth: 900 }}>
+                <h2 className="auth-title">จองห้องประชุม (Calendar)</h2>
 
-                <div style={{ marginBottom: 10, opacity: 0.85 }}>
-                    ผู้จอง: <b>{displayName}</b>
-                </div>
+                {errMsg && <p style={{ color: 'crimson', marginTop: 8 }}>{errMsg}</p>}
 
-                <div style={{ marginBottom: 10 }}>
-                    <b>วิธีเลือกวัน:</b> {selectionHint}
-                    <button
-                        type="button"
-                        onClick={clearSelection}
-                        style={{
-                            marginLeft: 10,
-                            padding: '6px 10px',
-                            borderRadius: 10,
-                            border: '1px solid #ccc',
-                            background: '#fff',
-                            cursor: 'pointer',
-                        }}
-                    >
-                        ล้างการเลือกวัน
-                    </button>
-                </div>
+                {rooms.length === 0 ? (
+                    <p>ยังไม่มีข้อมูลห้องประชุมในระบบ (เพิ่มข้อมูลใน public.meeting_rooms ก่อน)</p>
+                ) : (
+                    <form onSubmit={submit}>
+                        <div style={{ marginBottom: 10, opacity: 0.9 }}>
+                            ผู้จอง: <b>{displayName || session?.user?.email || session?.user?.id}</b>
+                        </div>
 
-                <div style={{ marginBottom: 16 }}>
-                    <FullCalendar
-                        plugins={[dayGridPlugin, interactionPlugin]}
-                        initialView="dayGridMonth"
-                        dateClick={handleDateClick}
-                        height="auto"
-                    />
-                </div>
+                        <label>เลือกห้อง</label>
+                        <select className="input" value={roomId} onChange={(e) => setRoomId(e.target.value)}>
+                            {rooms.map((r) => (
+                                <option key={r.room_id} value={r.room_id}>
+                                    {r.room_name}
+                                </option>
+                            ))}
+                        </select>
 
-                <form onSubmit={handleSubmit}>
-                    <label>ห้องประชุม</label>
-                    <select
-                        className="input"
-                        value={form.room_id}
-                        onChange={(e) => setForm({ ...form, room_id: e.target.value })}
-                        required
-                    >
-                        <option value="">-- เลือกห้อง --</option>
-                        {rooms.map((r) => (
-                            <option key={r.room_id} value={r.room_id}>
-                                {r.room_name}
-                            </option>
-                        ))}
-                    </select>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                            <div>
+                                <label>วันเริ่มจอง</label>
+                                <input
+                                    className="input"
+                                    type="datetime-local"
+                                    value={reservStart}
+                                    onChange={(e) => setReservStart(e.target.value)}
+                                />
+                                <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                                    ส่งไป backend เป็น ISO: <code>{toIsoUtc(reservStart) || '-'}</code>
+                                </div>
+                            </div>
 
-                    <label>วันเริ่มจอง</label>
-                    <input className="input" value={form.reserv_start} readOnly />
+                            <div>
+                                <label>วันสิ้นสุดการจอง</label>
+                                <input
+                                    className="input"
+                                    type="datetime-local"
+                                    value={reservEnd}
+                                    onChange={(e) => setReservEnd(e.target.value)}
+                                />
+                                <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                                    ส่งไป backend เป็น ISO: <code>{toIsoUtc(reservEnd) || '-'}</code>
+                                </div>
+                            </div>
+                        </div>
 
-                    <label>วันสิ้นสุดการจอง</label>
-                    <input className="input" value={form.reserv_end} readOnly />
+                        <label>เหตุผลในการจอง</label>
+                        <textarea
+                            className="input"
+                            rows={4}
+                            value={reservPurp}
+                            onChange={(e) => setReservPurp(e.target.value)}
+                            placeholder="ระบุเหตุผล..."
+                        />
 
-                    <label>เหตุผลในการจอง</label>
-                    <textarea
-                        className="input"
-                        rows={3}
-                        value={form.reserv_purp}
-                        onChange={(e) => setForm({ ...form, reserv_purp: e.target.value })}
-                    />
+                        <button className="auth-btn" type="submit" disabled={saving}>
+                            {saving ? 'กำลังบันทึก...' : 'บันทึกการจอง'}
+                        </button>
 
-                    <button className="auth-btn" type="submit" disabled={saving} style={{ marginTop: 16 }}>
-                        {saving ? 'กำลังบันทึก...' : 'ยืนยันการจอง (DB + Calendar)'}
-                    </button>
-                </form>
+                        <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
+                            API_BASE: <code>{API_BASE}</code>
+                            <br />
+                            client_tz: <code>{CLIENT_TZ}</code>
+                        </div>
+                    </form>
+                )}
             </div>
         </div>
     );
