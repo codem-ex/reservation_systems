@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจองห้องประชุม (Demo)</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* --- 1. SETUP & UTILS --- */
+        :root {
+            --primary-dark: #1e3a4c;
+            --primary-blue: #0f4c75;
+            --accent-green: #28a745;
+            --accent-red: #dc3545;
+            --accent-orange: #fd7e14;
+            --bg-gray: #f8f9fa;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Kanit', sans-serif; }
+        body { background-color: #fff; color: #333; overflow-x: hidden; }
+
+        /* --- 2. HEADER --- */
+        header {
+            background-color: var(--primary-dark);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            position: sticky; top: 0; z-index: 100;
+        }
+        .brand { font-size: 20px; font-weight: 500; }
+        
+        .header-right { display: flex; align-items: center; gap: 20px; }
+        .search-box {
+            position: relative;
+        }
+        .search-box input {
+            padding: 8px 35px 8px 15px;
+            border-radius: 20px;
+            border: none;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            outline: none;
+        }
+        .search-box i { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #ddd; }
+        
+        /* Profile Dropdown */
+        .user-profile { position: relative; cursor: pointer; }
+        .user-icon { font-size: 30px; background: rgba(255,255,255,0.2); width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 55px;
+            background: white;
+            color: #333;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            width: 150px;
+            overflow: hidden;
+        }
+        .dropdown-menu.show { display: block; }
+        .dropdown-item { padding: 10px 15px; display: block; text-decoration: none; color: #333; transition: 0.2s; }
+        .dropdown-item:hover { background: #f1f1f1; }
+
+        /* --- 3. MAIN CONTENT (HOME) --- */
+        .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+        
+        .welcome-section { text-align: center; margin-bottom: 40px; }
+        .welcome-title { font-size: 36px; font-weight: 700; margin-bottom: 10px; }
+        .btn-book-now {
+            background-color: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 12px 40px;
+            font-size: 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        .btn-book-now:hover { transform: scale(1.05); background-color: #0b3a5a; }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px;
+        }
+
+        /* Status Cards */
+        .status-card {
+            background: white;
+            border: 1px solid #eee;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .icon-circle {
+            width: 50px; height: 50px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; color: white;
+        }
+        .bg-green { background-color: var(--accent-green); }
+        .bg-orange { background-color: var(--accent-orange); }
+        .bg-yellow { background-color: #ffc107; color: #333; }
+        
+        .status-info h4 { font-size: 16px; color: #555; }
+        .status-info span { font-size: 24px; font-weight: 600; }
+
+        /* Upcoming List */
+        .upcoming-section h3 { margin-bottom: 15px; font-size: 20px; }
+        .upcoming-list {
+            height: 300px;
+            overflow-y: auto; /* Scrollable */
+            border: 1px solid #eee;
+            border-radius: 10px;
+            padding: 10px;
+            background: white;
+        }
+        .meeting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .meeting-item:last-child { border-bottom: none; }
+        .meeting-time { color: #777; font-size: 14px; }
+        
+        /* --- 4. MODAL SYSTEM (POPUPs) --- */
+        .modal-overlay {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active { display: flex; }
+
+        /* Common Modal Box */
+        .modal-box {
+            background: white;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            padding: 30px;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .modal-header { text-align: center; margin-bottom: 20px; position: relative; }
+        .btn-close-modal {
+            position: absolute; top: 10px; right: 10px;
+            background: transparent; border: none; font-size: 24px; cursor: pointer; color: #777;
+        }
+        
+        /* --- POPUP 1: Room Selection --- */
+        .room-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .room-card {
+            border: 1px solid #eee; border-radius: 10px; overflow: hidden;
+            cursor: pointer; transition: 0.2s;
+        }
+        .room-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .room-card img { width: 100%; height: 180px; object-fit: cover; }
+        .room-card-body { padding: 15px; }
+        .badge {
+            padding: 4px 12px; border-radius: 20px; color: white; font-size: 12px; display: inline-block; margin-bottom: 5px;
+        }
+        .badge-green { background: var(--accent-green); }
+        .badge-red { background: var(--accent-red); }
+        .btn-next-page {
+            display: block; margin: 20px 0 0 auto;
+            background: var(--primary-blue); color: white; padding: 10px 25px; border: none; border-radius: 5px; cursor: pointer;
+        }
+
+        /* --- POPUP 2: Room Details --- */
+        .detail-layout { display: flex; flex-direction: column; gap: 20px; }
+        .detail-slider-area { position: relative; width: 100%; height: 300px; background: #ddd; border-radius: 10px; overflow: hidden; }
+        .detail-img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; } /* Clickable image */
+        
+        .arrow-nav {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            background: rgba(0,0,0,0.5); color: white; border: none;
+            width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+            z-index: 2; font-size: 18px;
+        }
+        .arrow-prev { left: 10px; }
+        .arrow-next { right: 10px; }
+
+        .detail-content { text-align: left; }
+        .detail-dots { text-align: center; margin-top: -30px; position: relative; z-index: 2; margin-bottom: 20px;}
+        .dot { height: 10px; width: 10px; background-color: #bbb; border-radius: 50%; display: inline-block; margin: 0 5px; }
+        .dot.active { background-color: white; }
+
+        .nav-room-arrow {
+            position: absolute; top: 50%; font-size: 50px; color: rgba(0,0,0,0.2); cursor: pointer; transition: 0.2s;
+        }
+        .nav-room-arrow:hover { color: var(--primary-blue); }
+        .nav-room-prev { left: -60px; }
+        .nav-room-next { right: -60px; }
+
+        .btn-select-room {
+            background: var(--primary-blue); color: white; width: 100%; padding: 12px;
+            border: none; border-radius: 8px; font-size: 18px; cursor: pointer; margin-top: 10px;
+        }
+
+        /* --- POPUP 3: Full Screen Preview --- */
+        #modal-full-preview {
+            background: rgba(0,0,0,0.9); /* Darker background */
+        }
+        .full-img-container {
+            position: relative;
+            max-width: 90%;
+            max-height: 90%;
+            display: flex; justify-content: center;
+        }
+        .full-img {
+            max-width: 100%; max-height: 80vh; object-fit: contain;
+            border-radius: 5px;
+        }
+        /* Hidden class helper */
+        .hidden { display: none !important; }
+
+        /* Media Query for Mobile */
+        @media (max-width: 768px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .nav-room-arrow { display: none; } /* Hide side arrows on mobile */
+            .modal-box { width: 95%; padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">ระบบจองห้องประชุม (Pre)</div>
+        <div class="header-right">
+            <div class="search-box">
+                <input type="text" placeholder="ค้นหาห้อง">
+                <i class="fas fa-search"></i>
+            </div>
+            <div class="user-profile" onclick="toggleLoginMenu()">
+                <div class="user-icon"><i class="fas fa-user"></i></div>
+                <div class="dropdown-menu" id="loginDropdown">
+                    <a href="#" class="dropdown-item" onclick="alert('ไปหน้า Login');">Login (เฉพาะ ม.)</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="welcome-section">
+            <h1 class="welcome-title">ยินดีต้อนรับ!</h1>
+            <button class="btn-book-now" onclick="openRoomSelection()">จองห้องประชุมได้ที่นี่!!!</button>
+        </div>
+
+        <div class="dashboard-grid">
+            <div>
+                <div class="status-card">
+                    <div class="icon-circle bg-green"><i class="fas fa-check"></i></div>
+                    <div class="status-info"><h4>ห้องว่าง</h4><span>5</span></div>
+                </div>
+                <div class="status-card">
+                    <div class="icon-circle bg-orange"><i class="fas fa-clock"></i></div>
+                    <div class="status-info"><h4>กำลังใช้งาน</h4><span>3</span></div>
+                </div>
+                <div class="status-card">
+                    <div class="icon-circle bg-yellow"><i class="fas fa-wrench"></i></div>
+                    <div class="status-info"><h4>ปิดปรับปรุง</h4><span>1</span></div>
+                </div>
+            </div>
+
+            <div class="upcoming-section">
+                <h3>การประชุมที่จะถึง</h3>
+                <div class="upcoming-list">
+                    <div class="meeting-item">
+                        <div><strong>การประชุม A</strong><br><small>ห้องประชุม A</small></div>
+                        <div class="meeting-time">20 มกราคม 2569 | 09:00 - 10:00</div>
+                    </div>
+                    <div class="meeting-item">
+                        <div><strong>การประชุม B</strong><br><small>ห้องประชุม B</small></div>
+                        <div class="meeting-time">20 มกราคม 2569 | 14:00 - 15:00</div>
+                    </div>
+                    <div class="meeting-item">
+                        <div><strong>การประชุม C</strong><br><small>ห้องประชุม C</small></div>
+                        <div class="meeting-time">21 มกราคม 2569 | 09:00 - 10:00</div>
+                    </div>
+                    <div class="meeting-item">
+                        <div><strong>Workshop Design</strong><br><small>ห้องสัมมนา 5</small></div>
+                        <div class="meeting-time">22 มกราคม 2569 | 13:00 - 16:00</div>
+                    </div>
+                    <div class="meeting-item">
+                        <div><strong>Townhall</strong><br><small>ห้องประชุมใหญ่</small></div>
+                        <div class="meeting-time">23 มกราคม 2569 | 10:00 - 12:00</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-select-room">
+        <div class="modal-box">
+            <button class="btn-close-modal" onclick="closeModal('modal-select-room')"><i class="fas fa-times"></i></button>
+            <h2 class="modal-header">เลือกห้อง</h2>
+            
+            <div class="room-grid" id="roomGridContainer">
+                </div>
+            
+            <button class="btn-next-page" onclick="alert('โหลดหน้าถัดไป...')">ต่อไป</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-room-detail">
+        <div class="nav-room-arrow nav-room-prev" onclick="changeRoom(-1)"><i class="fas fa-chevron-left"></i></div>
+        <div class="nav-room-arrow nav-room-next" onclick="changeRoom(1)"><i class="fas fa-chevron-right"></i></div>
+
+        <div class="modal-box" style="max-width: 500px;">
+            <button class="btn-close-modal" onclick="closeModal('modal-room-detail'); openRoomSelection();"><i class="fas fa-times"></i></button> <div id="detailContent">
+                <div class="detail-slider-area">
+                    <img src="" id="detailMainImg" class="detail-img" onclick="openFullPreview()">
+                    <button class="arrow-nav arrow-prev" onclick="slideImage(-1)"><i class="fas fa-chevron-left"></i></button>
+                    <button class="arrow-nav arrow-next" onclick="slideImage(1)"><i class="fas fa-chevron-right"></i></button>
+                </div>
+                <div class="detail-dots">
+                    <span class="dot active"></span><span class="dot"></span><span class="dot"></span>
+                </div>
+
+                <h2 id="detailName" style="text-align:center; margin-bottom:5px;">ชื่อห้อง</h2>
+                <p id="detailCode" style="text-align:center; color:#777; margin-bottom:15px;">หมายเลข: xxx</p>
+                
+                <h3>รายละเอียดห้อง</h3>
+                <ul id="detailList" style="list-style: none; margin-bottom: 20px; line-height: 1.6;">
+                    </ul>
+
+                <button class="btn-select-room" onclick="alert('เปิด Popup กรอกข้อมูลผู้จอง (ยังไม่ต้องทำ)')">เลือก</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-full-preview" onclick="closeModal('modal-full-preview')">
+        <div class="full-img-container" onclick="event.stopPropagation()"> <button class="arrow-nav arrow-prev" style="left: -50px; font-size: 30px;" onclick="slideImage(-1, true)"><i class="fas fa-chevron-left"></i></button>
+            <img src="" id="fullPreviewImg" class="full-img">
+            <button class="arrow-nav arrow-next" style="right: -50px; font-size: 30px;" onclick="slideImage(1, true)"><i class="fas fa-chevron-right"></i></button>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA SETUP (จำลองข้อมูลห้อง) ---
+        const roomsData = [
+            {
+                id: 1,
+                name: "ห้องประชุมใหญ่",
+                status: "available",
+                location: "ชั้น 12, อาคาร A",
+                capacity: 200,
+                images: [
+                    "https://drive.google.com/uc?export=download&id=1GCZpr5RLctJzuvGvajd8c2yHuDnysFqL",
+                    "https://drive.google.com/uc?export=download&id=1gPvTM3TTY6jfQt3B6gb7uhkdmV7rUl_G",
+                    "https://drive.google.com/uc?export=download&id=1qBpUIH4ZfURXtMEaUYWuPLTjT2SdnOjc",
+                    "https://drive.google.com/uc?export=download&id=1vUdewp1Uqnny7zsaOmTuwDgy1vumxE_u"
+                ],
+                details: ["บรรจุคนได้ 200 คน", "แอร์ 8 ตัว", "มี Projector", "ไมค์ 4 ตัว"]
+            },
+            {
+                id: 2,
+                name: "ห้องครุสัมมนา 1",
+                status: "available",
+                location: "ชั้น 1, อาคาร B",
+                capacity: 10,
+                images: [
+                    "https://github.com/Ghoth9/project-wow/blob/main/%E0%B8%A3%E0%B8%B9%E0%B8%9B%E0%B8%AB%E0%B9%89%E0%B8%AD%E0%B8%87%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%8A%E0%B8%A1%202/%E0%B8%AB%E0%B9%89%E0%B8%AD%E0%B8%87%E0%B8%84%E0%B8%A3%E0%B8%B8%E0%B8%AA%E0%B8%B1%E0%B8%A1%E0%B8%A1%E0%B8%99%E0%B8%B2%201%20(2).jpg?raw=true",
+                    "https://drive.google.com/uc?export=download&id=1eEQ5yqhFhu4VsMpFmoJvqE1D2ZPxQ7p2",
+                    "https://drive.google.com/uc?export=download&id=1f-XCLKjPxVDLcvjOVgKV38FmDq4XKfTw"
+                    
+                ],
+                details: ["บรรจุคนได้ 10 คน", "ทีวี 1 เครื่อง", "Whiteboard", "แอร์ 1 ตัว"]
+            },
+            {
+                id: 3,
+                name: "ห้องประชุมกลาง",
+                status: "busy",
+                location: "ชั้น 12, อาคาร A",
+                capacity: 50,
+                images: [
+                    "https://images.unsplash.com/photo-1577412647305-991150c7d163?w=800"
+                ],
+                details: ["บรรจุคนได้ 50 คน", "Projector", "เครื่องเสียง"]
+            },
+            {
+                id: 4,
+                name: "ห้องสัมมนาชั้น 5",
+                status: "available",
+                location: "ชั้น 5, อาคาร C",
+                capacity: 100,
+                images: [
+                    "https://drive.google.com/uc?export=download&id=124TyUorq-muyhKVckzFQpobMMZjAfKPk",
+                    "https://drive.google.com/uc?export=download&id=1J_gtke_8yk62sPFz1D0cHidDcy8-Kdnk",
+                    "https://drive.google.com/uc?export=download&id=1PsiCa1D6xpsPGP2deqQR1uqm5cqKaLc0",
+                    "https://drive.google.com/uc?export=download&id=1XZWaH_c4h1aek_SmI3H5Ri-fLSOSoaiw",
+                    "https://drive.google.com/uc?export=download&id=1dYeyYm-9OKJJlUAC0v6nS9vsdxTsUb7Q"
+                ],
+                details: ["บรรจุคนได้ 100 คน", "แอร์ 8 ตัว", "มี Projector", "ทีวี 2 ตัว"]
+            }
+        ];
+
+        let currentRoomIndex = 0; // ห้องที่กำลังดูรายละเอียด
+        let currentImageIndex = 0; // รูปที่กำลังดูใน Slider
+
+        // --- FUNCTIONS ---
+
+        // 1. Toggle Login Dropdown
+        function toggleLoginMenu() {
+            document.getElementById('loginDropdown').classList.toggle('show');
+        }
+
+        // Close dropdown if clicked outside
+        window.onclick = function(event) {
+            if (!event.target.matches('.user-profile') && !event.target.closest('.user-profile')) {
+                var dropdowns = document.getElementsByClassName("dropdown-menu");
+                for (var i = 0; i < dropdowns.length; i++) {
+                    if (dropdowns[i].classList.contains('show')) {
+                        dropdowns[i].classList.remove('show');
+                    }
+                }
+            }
+        }
+
+        // 2. Open Room Selection (Generate Grid)
+        function openRoomSelection() {
+            const container = document.getElementById('roomGridContainer');
+            container.innerHTML = ''; // Clear old
+
+            roomsData.forEach((room, index) => {
+                const statusBadge = room.status === 'available' 
+                    ? `<span class="badge badge-green">ว่าง</span>` 
+                    : `<span class="badge badge-red">ไม่ว่าง</span>`;
+
+                const cardHtml = `
+                    <div class="room-card" onclick="openRoomDetail(${index})">
+                        <img src="${room.images[0]}" alt="${room.name}">
+                        <div class="room-card-body">
+                            <h3>${room.name}</h3>
+                            ${statusBadge}
+                            <div style="font-size:14px; color:#555; margin-top:5px;">
+                                <div>${room.location}</div>
+                                <div><i class="fas fa-user"></i> ${room.capacity}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += cardHtml;
+            });
+
+            document.getElementById('modal-select-room').classList.add('active');
+        }
+
+        // 3. Open Room Detail Modal
+        function openRoomDetail(index) {
+            currentRoomIndex = index;
+            currentImageIndex = 0; // Reset image to first one
+            updateDetailView();
+            
+            // Hide selection modal, Show detail modal
+            document.getElementById('modal-select-room').classList.remove('active');
+            document.getElementById('modal-room-detail').classList.add('active');
+        }
+
+        // Update content inside Detail Modal
+        function updateDetailView() {
+            const room = roomsData[currentRoomIndex];
+            
+            // Text
+            document.getElementById('detailName').innerText = room.name;
+            document.getElementById('detailCode').innerText = "หมายเลขการจอง: " + (1111111 + room.id);
+            
+            // Details List
+            const listContainer = document.getElementById('detailList');
+            listContainer.innerHTML = room.details.map(d => `<li>${d}</li>`).join('');
+
+            // Image
+            updateImages();
+        }
+
+        function updateImages() {
+            const room = roomsData[currentRoomIndex];
+            const imgUrl = room.images[currentImageIndex];
+            
+            document.getElementById('detailMainImg').src = imgUrl;
+            document.getElementById('fullPreviewImg').src = imgUrl; // Prep full image too
+
+            // Update dots (simple implementation)
+            const dots = document.querySelectorAll('.dot');
+            dots.forEach((dot, idx) => {
+                dot.classList.toggle('active', idx === currentImageIndex % 3); // Modulo for demo dots
+            });
+        }
+
+        // 4. Slide Images (Next/Prev)
+        function slideImage(dir, isFullPreview = false) {
+            const room = roomsData[currentRoomIndex];
+            const totalImages = room.images.length;
+
+            currentImageIndex += dir;
+            if (currentImageIndex < 0) currentImageIndex = totalImages - 1;
+            if (currentImageIndex >= totalImages) currentImageIndex = 0;
+
+            updateImages();
+        }
+
+        // 5. Change Room (Prev/Next Room)
+        function changeRoom(dir) {
+            currentRoomIndex += dir;
+            if (currentRoomIndex < 0) currentRoomIndex = roomsData.length - 1;
+            if (currentRoomIndex >= roomsData.length) currentRoomIndex = 0;
+            
+            updateDetailView();
+        }
+
+        // 6. Full Preview
+        function openFullPreview() {
+            // Modal Detail stays open in background
+            document.getElementById('modal-full-preview').classList.add('active');
+        }
+
+        // 7. Close Modals
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+    </script>
+</body>
+</html>
