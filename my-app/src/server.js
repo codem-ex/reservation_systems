@@ -4,14 +4,11 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
-import { google } from "googleapis";
 
 dotenv.config();
 
 const app = express();
 app.use(cors({ origin: true }));
-
-// ✅ ต้องอยู่ก่อน routes ทุกตัว
 app.use(express.json({ limit: "10mb" }));
 
 /**
@@ -24,10 +21,6 @@ app.use(express.json({ limit: "10mb" }));
  * (optional)
  * RESEND_API_KEY=...
  * MAIL_FROM="Meeting Rooms <no-reply@yourdomain.com>"
- *
- * (optional for Google Calendar)
- * GOOGLE_SERVICE_ACCOUNT_JSON=... (JSON string ของ service account ทั้งก้อน)
- * GOOGLE_CALENDAR_ID=...          (Calendar ID ของ shared calendar / resource calendar)
  */
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -110,98 +103,6 @@ function buildDisplayName({ profileRow, authUser }) {
 }
 
 // ============================
-// GOOGLE CALENDAR (Service Account)
-// ============================
-function canUseGoogleCalendar() {
-    return !!(process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_CALENDAR_ID);
-}
-
-function getCalendarClient() {
-    const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-    if (!raw) throw new Error("Missing GOOGLE_SERVICE_ACCOUNT_JSON in env");
-
-    let sa;
-    try {
-        sa = JSON.parse(raw);
-    } catch {
-        throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON");
-    }
-
-    if (!sa?.client_email || !sa?.private_key) {
-        throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON missing client_email/private_key");
-    }
-
-    const auth = new google.auth.JWT({
-        email: sa.client_email,
-        key: sa.private_key,
-        scopes: ["https://www.googleapis.com/auth/calendar"],
-    });
-
-    return google.calendar({ version: "v3", auth });
-}
-
-function safeIso(isoLike) {
-    // isoLike อาจเป็น ISO หรือ string อื่น ๆ ให้ validate แบบไม่พึ่งพา timezone เดา
-    const d = new Date(isoLike);
-    if (Number.isNaN(d.getTime())) return null;
-    return d.toISOString();
-}
-
-async function insertReservationToGoogleCalendar({
-    reservation,
-    room,
-    reservByName,
-    timeZone,
-}) {
-    const calendarId = process.env.GOOGLE_CALENDAR_ID;
-    const calendar = getCalendarClient();
-
-    const startIso = safeIso(reservation.reserv_start);
-    const endIso = safeIso(reservation.reserv_end);
-
-    if (!startIso || !endIso) {
-        throw new Error("Invalid reserv_start/reserv_end (cannot parse to valid datetime)");
-    }
-
-    const event = {
-        summary: `จองห้อง: ${room?.room_name || reservation.room_id}`,
-        description: [
-            `ใบจอง: ${reservation.reserv_id}`,
-            `ผู้จอง: ${reservByName || reservation.who_reserv_id}`,
-            `เหตุผล: ${reservation.reserv_purp || "-"}`,
-        ].join("\n"),
-        start: { dateTime: startIso, timeZone },
-        end: { dateTime: endIso, timeZone },
-    };
-
-    console.log("[GCAL] calendarId =", calendarId);
-    console.log("[GCAL] event payload =", JSON.stringify(event));
-
-    try {
-        const res = await calendar.events.insert({
-            calendarId,
-            requestBody: event,
-        });
-
-        console.log("[GCAL] inserted =", res.data?.id, res.data?.htmlLink);
-
-        return {
-            ok: true,
-            event_id: res.data?.id || null,
-            htmlLink: res.data?.htmlLink || null,
-        };
-    } catch (err) {
-        const detail = err?.response?.data || err;
-        console.error("[GCAL] insert failed =", JSON.stringify(detail));
-        return {
-            ok: false,
-            error: detail?.error?.message || detail?.message || "Google Calendar insert failed",
-            detail,
-        };
-    }
-}
-
-// ============================
 // HEALTH
 // ============================
 app.get("/api/health", (req, res) => {
@@ -209,10 +110,9 @@ app.get("/api/health", (req, res) => {
 });
 
 // ============================
-// ✅ RESERVATION: CREATE
+// ✅ RESERVATION: CREATE (WITH AUTO-APPROVAL STAGES)
 // POST /api/reservations/create
-// body: { room_id, reserv_start, reserv_end OR reserv_end_inclusive, reserv_purp, client_tz? }
-// รองรับสำรอง: roomId/reservStart/reservEnd/reservPurp (camelCase) และ reserv_end_inclusive
+// body: { room_id, reserv_start, reserv_end OR reserv_end_inclusive, reserv_purp }
 // ============================
 app.post("/api/reservations/create", async (req, res) => {
     try {
@@ -222,10 +122,11 @@ app.post("/api/reservations/create", async (req, res) => {
         const user = u.user;
         const body = req.body || {};
 
+        // รองรับ snake_case / camelCase
         const room_id = body.room_id ?? body.roomId ?? null;
         const reserv_start = body.reserv_start ?? body.reservStart ?? null;
 
-        // ✅ รองรับทั้ง reserv_end และ reserv_end_inclusive
+        // ✅ รองรับ reserv_end และ reserv_end_inclusive
         const reserv_end =
             body.reserv_end ??
             body.reservEnd ??
@@ -234,38 +135,17 @@ app.post("/api/reservations/create", async (req, res) => {
             null;
 
         const reserv_purp = body.reserv_purp ?? body.reservPurp ?? null;
-        const client_tz = String(body.client_tz || body.clientTz || "Asia/Bangkok");
 
         if (!room_id || !reserv_start || !reserv_end || !reserv_purp) {
             return res.status(400).json({
                 ok: false,
-                message:
-                    "Missing required fields (need room_id, reserv_start, reserv_end, reserv_purp)",
+                message: "Missing required fields (need room_id, reserv_start, reserv_end, reserv_purp)",
                 received_keys: Object.keys(body || {}),
                 received_body: body,
             });
         }
 
-        // Validate datetime ให้แน่นอน (รองรับ ISO จาก frontend)
-        const startIso = safeIso(reserv_start);
-        const endIso = safeIso(reserv_end);
-        if (!startIso || !endIso) {
-            return res.status(400).json({
-                ok: false,
-                message: "Invalid datetime format (reserv_start/reserv_end). Expected ISO datetime.",
-                received_body: { reserv_start, reserv_end },
-            });
-        }
-
-        if (new Date(endIso) <= new Date(startIso)) {
-            return res.status(400).json({
-                ok: false,
-                message: "reserv_end must be greater than reserv_start",
-                received_body: { reserv_start: startIso, reserv_end: endIso },
-            });
-        }
-
-        // ตรวจว่าห้องมีจริง
+        // 1) ตรวจว่าห้องมีจริง (meeting_rooms ใช้ room_id)
         const { data: room, error: roomErr } = await supabaseAdmin
             .from("meeting_rooms")
             .select("room_id, room_name")
@@ -276,10 +156,11 @@ app.post("/api/reservations/create", async (req, res) => {
             return res.status(400).json({ ok: false, message: "Room not found (invalid room_id)" });
         }
 
+        // 2) Insert ใบจอง
         const insertPayload = {
             room_id,
-            reserv_start: startIso,
-            reserv_end: endIso,
+            reserv_start,
+            reserv_end,
             reserv_purp: String(reserv_purp).trim(),
             who_reserv_id: user.id,
         };
@@ -292,174 +173,70 @@ app.post("/api/reservations/create", async (req, res) => {
 
         if (insErr) return res.status(400).json({ ok: false, message: insErr.message });
 
-        // หา display name เพื่อใส่ description ใน calendar
-        let reservByName = "";
-        try {
-            const { data: prof } = await supabaseAdmin
-                .from("profiles")
-                .select("first_name, last_name, email")
-                .eq("id", user.id)
-                .single();
-            reservByName = buildDisplayName({ profileRow: prof, authUser: user });
-        } catch {
-            reservByName = user?.email || user?.id || "";
+        const reservId = inserted.reserv_id;
+
+        // 3) ✅ สร้าง Stage approvals อัตโนมัติจาก approver_chain (ต้องมี 2 ขั้น)
+        // รองรับทั้ง is_active และ active (เพราะ schema ของคุณเป็น is_active)
+        const chainSelect = await supabaseAdmin
+            .from("approver_chain")
+            .select("stage_no, approver_id, is_active, active")
+            .order("stage_no", { ascending: true });
+
+        if (chainSelect.error) {
+            return res.status(400).json({ ok: false, message: `Load approver_chain failed: ${chainSelect.error.message}` });
         }
 
-        // Google Calendar insert (ไม่ทำให้การจองล้ม ถ้า GCAL พัง)
-        let calendarResult = { ok: false, skipped: true, reason: "Google Calendar not configured" };
+        const chainRowsAll = chainSelect.data || [];
 
-        if (canUseGoogleCalendar()) {
-            calendarResult = await insertReservationToGoogleCalendar({
-                reservation: inserted,
-                room,
-                reservByName,
-                timeZone: client_tz,
+        // filter active
+        const chainRows = chainRowsAll
+            .filter((r) => (r.is_active === true) || (r.active === true))
+            .filter((r) => r.stage_no === 1 || r.stage_no === 2)
+            .sort((a, b) => (a.stage_no ?? 0) - (b.stage_no ?? 0));
+
+        if (chainRows.length < 2) {
+            return res.status(400).json({
+                ok: false,
+                message: "ระบบยังไม่มี Stage ครบ 2 ขั้น (ตรวจว่า approver_chain ตั้ง active ไว้ครบหรือยัง)",
+                chain_active_rows: chainRows,
             });
-        } else {
-            console.warn("[GCAL] skipped: missing GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_CALENDAR_ID");
+        }
+
+        // ต้องมี stage 1 และ 2 จริง
+        const has1 = chainRows.some((r) => r.stage_no === 1 && r.approver_id);
+        const has2 = chainRows.some((r) => r.stage_no === 2 && r.approver_id);
+        if (!has1 || !has2) {
+            return res.status(400).json({
+                ok: false,
+                message: "approver_chain ต้องมี approver_id ครบทั้ง stage 1 และ stage 2",
+                chain_active_rows: chainRows,
+            });
+        }
+
+        const approvalsPayload = chainRows.map((c) => ({
+            reservation_id: reservId,
+            stage_no: c.stage_no,
+            approver_id: c.approver_id,
+            status: "PENDING",
+        }));
+
+        const { error: apprErr } = await supabaseAdmin
+            .from("reservation_approvals")
+            .insert(approvalsPayload);
+
+        if (apprErr) {
+            return res.status(400).json({
+                ok: false,
+                message: `Create approvals failed: ${apprErr.message}`,
+                approvalsPayload,
+            });
         }
 
         return res.json({
             ok: true,
             reservation: inserted,
-            calendar: calendarResult,
+            approvals_created: approvalsPayload.length,
         });
-    } catch (err) {
-        return res.status(500).json({ ok: false, message: err?.message || String(err) });
-    }
-});
-
-// ============================
-// ADMIN: USERS
-// ============================
-app.get("/api/admin/users", async (req, res) => {
-    try {
-        const auth = await requireAdmin(req);
-        if (!auth.ok) return res.status(auth.status).json({ ok: false, message: auth.message });
-
-        const perPage = 200;
-        let page = 1;
-        let all = [];
-
-        while (true) {
-            const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
-            if (error) return res.status(500).json({ ok: false, message: error.message });
-
-            const batch = data?.users || [];
-            all = all.concat(batch);
-
-            if (batch.length < perPage) break;
-            page += 1;
-            if (page > 50) break;
-        }
-
-        const ids = all.map((u) => u.id);
-
-        const { data: profRows, error: pErr } = await supabaseAdmin
-            .from("profiles")
-            .select("id, first_name, last_name")
-            .in("id", ids);
-
-        if (pErr) return res.status(500).json({ ok: false, message: pErr.message });
-
-        const profMap = new Map();
-        (profRows || []).forEach((p) => profMap.set(p.id, p));
-
-        const users = all.map((u) => {
-            const p = profMap.get(u.id);
-            const first_name = p?.first_name || "";
-            const last_name = p?.last_name || "";
-            const full_from_profile = `${first_name}${last_name ? ` ${last_name}` : ""}`.trim();
-            const full_from_meta = u.user_metadata?.full_name || "";
-            const display_name = full_from_profile || full_from_meta || u.email || u.id;
-
-            return {
-                id: u.id,
-                email: u.email || null,
-                first_name: first_name || null,
-                last_name: last_name || null,
-                display_name,
-                created_at: u.created_at || null,
-            };
-        });
-
-        return res.json({ ok: true, users });
-    } catch (err) {
-        return res.status(500).json({ ok: false, message: err?.message || String(err) });
-    }
-});
-
-// ============================
-// ADMIN: APPROVERS
-// ============================
-app.get("/api/admin/approvers", async (req, res) => {
-    try {
-        const auth = await requireAdmin(req);
-        if (!auth.ok) return res.status(auth.status).json({ ok: false, message: auth.message });
-
-        const { data, error } = await supabaseAdmin
-            .from("approver_info")
-            .select("user_id, approv_name, approv_pos")
-            .order("approv_name", { ascending: true });
-
-        if (error) return res.status(400).json({ ok: false, message: error.message });
-        return res.json({ ok: true, approvers: data || [] });
-    } catch (err) {
-        return res.status(500).json({ ok: false, message: err?.message || String(err) });
-    }
-});
-
-app.post("/api/admin/approvers/upsert", async (req, res) => {
-    try {
-        const auth = await requireAdmin(req);
-        if (!auth.ok) return res.status(auth.status).json({ ok: false, message: auth.message });
-
-        const { user_id, approv_name, approv_pos } = req.body || {};
-        if (!user_id) return res.status(400).json({ ok: false, message: "Missing user_id" });
-        if (!approv_pos || !String(approv_pos).trim()) {
-            return res.status(400).json({ ok: false, message: "Missing approv_pos" });
-        }
-
-        const { data: prof, error: profErr } = await supabaseAdmin
-            .from("profiles")
-            .select("id, first_name, last_name")
-            .eq("id", user_id)
-            .single();
-
-        if (profErr || !prof) {
-            return res.status(400).json({
-                ok: false,
-                message: "User has no profile row in public.profiles (FK requires profiles.id).",
-            });
-        }
-
-        const fallbackName = `${prof.first_name || ""}${prof.last_name ? ` ${prof.last_name}` : ""}`.trim();
-        const nameToSave = String(approv_name || "").trim() || fallbackName || "(ไม่พบชื่อ)";
-
-        const { error } = await supabaseAdmin
-            .from("approver_info")
-            .upsert(
-                { user_id, approv_name: nameToSave, approv_pos: String(approv_pos).trim() },
-                { onConflict: "user_id" }
-            );
-
-        if (error) return res.status(400).json({ ok: false, message: error.message });
-        return res.json({ ok: true });
-    } catch (err) {
-        return res.status(500).json({ ok: false, message: err?.message || String(err) });
-    }
-});
-
-app.delete("/api/admin/approvers/:userId", async (req, res) => {
-    try {
-        const auth = await requireAdmin(req);
-        if (!auth.ok) return res.status(auth.status).json({ ok: false, message: auth.message });
-
-        const userId = req.params.userId;
-        const { error } = await supabaseAdmin.from("approver_info").delete().eq("user_id", userId);
-        if (error) return res.status(400).json({ ok: false, message: error.message });
-
-        return res.json({ ok: true });
     } catch (err) {
         return res.status(500).json({ ok: false, message: err?.message || String(err) });
     }
@@ -597,7 +374,7 @@ app.post("/api/approvals/act", async (req, res) => {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// CRA: build / Vite: dist (ปรับตามของคุณ)
+// CRA build folder
 const reactBuildDir = path.join(__dirname, "..", "build");
 
 app.use(express.static(reactBuildDir));
