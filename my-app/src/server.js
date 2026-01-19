@@ -9,6 +9,8 @@ dotenv.config();
 
 const app = express();
 app.use(cors({ origin: true }));
+
+// สำคัญ: ต้องมาก่อน routes
 app.use(express.json({ limit: "10mb" }));
 
 /**
@@ -110,9 +112,12 @@ app.get("/api/health", (req, res) => {
 });
 
 // ============================
-// ✅ RESERVATION: CREATE (WITH AUTO-APPROVAL STAGES)
+// RESERVATION: CREATE (AUTO CREATE 2 STAGES)
 // POST /api/reservations/create
-// body: { room_id, reserv_start, reserv_end OR reserv_end_inclusive, reserv_purp }
+// body accepted:
+// - snake_case: room_id, reserv_start, reserv_end, reserv_purp
+// - OR reserv_end_inclusive (frontend เก่า)
+// - OR camelCase: roomId, reservStart, reservEnd, reservPurp, reservEndInclusive
 // ============================
 app.post("/api/reservations/create", async (req, res) => {
     try {
@@ -122,11 +127,10 @@ app.post("/api/reservations/create", async (req, res) => {
         const user = u.user;
         const body = req.body || {};
 
-        // รองรับ snake_case / camelCase
         const room_id = body.room_id ?? body.roomId ?? null;
         const reserv_start = body.reserv_start ?? body.reservStart ?? null;
 
-        // ✅ รองรับ reserv_end และ reserv_end_inclusive
+        // ✅ รองรับทั้ง reserv_end และ reserv_end_inclusive
         const reserv_end =
             body.reserv_end ??
             body.reservEnd ??
@@ -175,36 +179,35 @@ app.post("/api/reservations/create", async (req, res) => {
 
         const reservId = inserted.reserv_id;
 
-        // 3) ✅ สร้าง Stage approvals อัตโนมัติจาก approver_chain (ต้องมี 2 ขั้น)
-        // รองรับทั้ง is_active และ active (เพราะ schema ของคุณเป็น is_active)
-        const chainSelect = await supabaseAdmin
+        // 3) โหลด approver_chain ที่ is_active=true (มีเฉพาะ is_active ตามที่คุณแจ้ง)
+        const { data: chainAll, error: chainErr } = await supabaseAdmin
             .from("approver_chain")
-            .select("stage_no, approver_id, is_active, active")
+            .select("stage_no, approver_id, is_active")
             .order("stage_no", { ascending: true });
 
-        if (chainSelect.error) {
-            return res.status(400).json({ ok: false, message: `Load approver_chain failed: ${chainSelect.error.message}` });
+        if (chainErr) {
+            return res.status(400).json({
+                ok: false,
+                message: `Load approver_chain failed: ${chainErr.message}`,
+            });
         }
 
-        const chainRowsAll = chainSelect.data || [];
-
-        // filter active
-        const chainRows = chainRowsAll
-            .filter((r) => (r.is_active === true) || (r.active === true))
+        const chainRows = (chainAll || [])
+            .filter((r) => r.is_active === true)
             .filter((r) => r.stage_no === 1 || r.stage_no === 2)
             .sort((a, b) => (a.stage_no ?? 0) - (b.stage_no ?? 0));
 
         if (chainRows.length < 2) {
             return res.status(400).json({
                 ok: false,
-                message: "ระบบยังไม่มี Stage ครบ 2 ขั้น (ตรวจว่า approver_chain ตั้ง active ไว้ครบหรือยัง)",
+                message: "ระบบยังไม่มี Stage ครบ 2 ขั้น (ตรวจว่า approver_chain ตั้ง is_active ไว้ครบหรือยัง)",
                 chain_active_rows: chainRows,
             });
         }
 
-        // ต้องมี stage 1 และ 2 จริง
         const has1 = chainRows.some((r) => r.stage_no === 1 && r.approver_id);
         const has2 = chainRows.some((r) => r.stage_no === 2 && r.approver_id);
+
         if (!has1 || !has2) {
             return res.status(400).json({
                 ok: false,
@@ -213,29 +216,52 @@ app.post("/api/reservations/create", async (req, res) => {
             });
         }
 
-        const approvalsPayload = chainRows.map((c) => ({
-            reservation_id: reservId,
-            stage_no: c.stage_no,
-            approver_id: c.approver_id,
-            status: "PENDING",
-        }));
-
-        const { error: apprErr } = await supabaseAdmin
+        // 4) ✅ กันซ้ำ: โหลด approvals ที่มีอยู่แล้วของ reservation นี้
+        const { data: existingApprovals, error: existErr } = await supabaseAdmin
             .from("reservation_approvals")
-            .insert(approvalsPayload);
+            .select("stage_no, approver_id")
+            .eq("reservation_id", reservId);
 
-        if (apprErr) {
+        if (existErr) {
             return res.status(400).json({
                 ok: false,
-                message: `Create approvals failed: ${apprErr.message}`,
-                approvalsPayload,
+                message: `Load existing approvals failed: ${existErr.message}`,
             });
+        }
+
+        const existingSet = new Set(
+            (existingApprovals || []).map((r) => `${r.stage_no}:${r.approver_id}`)
+        );
+
+        // 5) Insert เฉพาะที่ยังไม่มี
+        const approvalsToInsert = chainRows
+            .filter((c) => !existingSet.has(`${c.stage_no}:${c.approver_id}`))
+            .map((c) => ({
+                reservation_id: reservId,
+                stage_no: c.stage_no,
+                approver_id: c.approver_id,
+                status: "PENDING",
+            }));
+
+        if (approvalsToInsert.length > 0) {
+            const { error: apprErr } = await supabaseAdmin
+                .from("reservation_approvals")
+                .insert(approvalsToInsert);
+
+            if (apprErr) {
+                return res.status(400).json({
+                    ok: false,
+                    message: `Create approvals failed: ${apprErr.message}`,
+                    approvalsToInsert,
+                });
+            }
         }
 
         return res.json({
             ok: true,
             reservation: inserted,
-            approvals_created: approvalsPayload.length,
+            approvals_created: approvalsToInsert.length,
+            approvals_existing: (existingApprovals || []).length,
         });
     } catch (err) {
         return res.status(500).json({ ok: false, message: err?.message || String(err) });
@@ -244,6 +270,9 @@ app.post("/api/reservations/create", async (req, res) => {
 
 // ============================
 // APPROVAL ACTION
+// POST /api/approvals/act
+// body: { approval_id, action: 'APPROVED'|'REJECTED', note? }
+// บันทึก acted_by_id + acted_by_name
 // ============================
 app.post("/api/approvals/act", async (req, res) => {
     try {
@@ -314,7 +343,7 @@ app.post("/api/approvals/act", async (req, res) => {
 
         if (uErr) return res.status(400).json({ ok: false, message: uErr.message });
 
-        // Email notify (optional)
+        // ส่งอีเมล (optional)
         let emailed = false;
         try {
             const { data: rRow } = await supabaseAdmin
@@ -374,7 +403,7 @@ app.post("/api/approvals/act", async (req, res) => {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// CRA build folder
+// CRA build folder (ปรับถ้าใช้ Vite เป็น dist)
 const reactBuildDir = path.join(__dirname, "..", "build");
 
 app.use(express.static(reactBuildDir));
