@@ -20,6 +20,9 @@ app.use(express.json({ limit: "10mb" }));
  * SUPABASE_URL=...
  * SUPABASE_SERVICE_ROLE_KEY=...  (backend only)
  *
+ * (recommended for user-context queries on views that use auth.uid()):
+ * SUPABASE_ANON_KEY=...
+ *
  * (optional)
  * RESEND_API_KEY=...
  * MAIL_FROM="Meeting Rooms <no-reply@yourdomain.com>"
@@ -31,6 +34,8 @@ app.use(express.json({ limit: "10mb" }));
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// ✅ เพิ่ม: ใช้สำหรับ query แบบ user-context (แก้ปัญหา view ที่ใช้ auth.uid())
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in env");
@@ -97,6 +102,17 @@ async function requireAdmin(req) {
     return { ok: true, user: u.user };
 }
 
+// ✅ เพิ่ม: สร้าง client แบบ user-context เพื่อให้ auth.uid() ใน VIEW ทำงาน
+function createSupabaseUserClient(accessToken) {
+    if (!SUPABASE_ANON_KEY) {
+        throw new Error("Missing SUPABASE_ANON_KEY in env (required for user-context queries on views)");
+    }
+    return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: false },
+        global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    });
+}
+
 async function sendEmailResend({ to, subject, text }) {
     const apiKey = process.env.RESEND_API_KEY;
     const from = process.env.MAIL_FROM;
@@ -140,16 +156,19 @@ app.get("/api/health", (req, res) => {
 // ============================
 // ✅ APPROVER TASKS (เพิ่มให้ครบตามที่ frontend เรียก)
 // GET /api/approver/tasks
-// - ใช้ view v_approver_tasks ที่คุณสร้างไว้แล้ว
-// - ใช้ token verify ด้วย supabaseAdmin.auth.getUser(token)
+// - ใช้ view v_approver_tasks ที่มี WHERE ra.approver_id = auth.uid()
+// - ดังนั้นต้อง query ด้วย "user-context" (anon key + Authorization Bearer token)
 // ============================
 app.get("/api/approver/tasks", async (req, res) => {
     try {
+        const token = getBearerToken(req);
         const u = await requireUser(req);
         if (!u.ok) return res.status(u.status).json({ ok: false, message: u.message });
 
-        // ดึงงานจาก view
-        const { data, error } = await supabaseAdmin
+        // ✅ สำคัญ: query view ด้วย user-context เพื่อให้ auth.uid() ใน view ทำงาน
+        const supabaseUser = createSupabaseUserClient(token);
+
+        const { data, error } = await supabaseUser
             .from("v_approver_tasks")
             .select(
                 [
@@ -165,7 +184,6 @@ app.get("/api/approver/tasks", async (req, res) => {
                     "reserv_purp",
                     "reserv_by_name",
                     "acted_by_name",
-                    // fields เผื่อมีใน view
                     "approver_name",
                     "approver_pos",
                 ].join(",")
