@@ -10,7 +10,7 @@ dotenv.config();
 const app = express();
 app.use(cors({ origin: true }));
 
-// สำคัญ: ต้องมาก่อน routes
+// ✅ ต้องอยู่ก่อน routes ทุกตัว
 app.use(express.json({ limit: "10mb" }));
 
 /**
@@ -23,6 +23,10 @@ app.use(express.json({ limit: "10mb" }));
  * (optional)
  * RESEND_API_KEY=...
  * MAIL_FROM="Meeting Rooms <no-reply@yourdomain.com>"
+ *
+ * (optional for gcal later)
+ * GOOGLE_SERVICE_ACCOUNT_JSON=...
+ * GOOGLE_CALENDAR_ID=...
  */
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -36,17 +40,40 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
 });
 
+// ============================
+// Request log (ช่วยไล่ 401/404/500)
+// ============================
+app.use((req, res, next) => {
+    const id = Math.random().toString(36).slice(2, 8);
+    req._reqId = id;
+
+    const auth = req.headers.authorization || "";
+    const hasBearer = auth.toLowerCase().startsWith("bearer ");
+    const tokenLen = hasBearer ? auth.slice(7).trim().length : 0;
+
+    console.log(
+        `[REQ ${id}] ${req.method} ${req.originalUrl} host=${req.headers.host} auth=${hasBearer ? `Bearer(${tokenLen})` : "no"
+        }`
+    );
+
+    res.on("finish", () => console.log(`[RES ${id}] -> ${res.statusCode}`));
+    next();
+});
+
 function getBearerToken(req) {
     const authHeader = req.headers.authorization || "";
-    return authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!authHeader) return null;
+    if (authHeader.startsWith("Bearer ")) return authHeader.slice(7).trim();
+    if (authHeader.toLowerCase().startsWith("bearer ")) return authHeader.slice(7).trim();
+    return null;
 }
 
 async function requireUser(req) {
     const token = getBearerToken(req);
-    if (!token) return { ok: false, status: 401, message: "Missing access token" };
+    if (!token) return { ok: false, status: 401, message: "Unauthorized (no token)" };
 
     const { data, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !data?.user) return { ok: false, status: 401, message: "Invalid token" };
+    if (error || !data?.user) return { ok: false, status: 401, message: "Unauthorized (invalid token)" };
 
     return { ok: true, user: data.user };
 }
@@ -95,10 +122,9 @@ async function sendEmailResend({ to, subject, text }) {
 }
 
 function buildDisplayName({ profileRow, authUser }) {
-    const fromProfile =
-        profileRow?.first_name
-            ? `${profileRow.first_name}${profileRow?.last_name ? ` ${profileRow.last_name}` : ""}`
-            : "";
+    const fromProfile = profileRow?.first_name
+        ? `${profileRow.first_name}${profileRow?.last_name ? ` ${profileRow.last_name}` : ""}`
+        : "";
     const fromMeta = authUser?.user_metadata?.full_name || "";
     const fromEmail = authUser?.email || "";
     return fromProfile || fromMeta || fromEmail || authUser?.id || "";
@@ -112,12 +138,53 @@ app.get("/api/health", (req, res) => {
 });
 
 // ============================
-// RESERVATION: CREATE (AUTO CREATE 2 STAGES)
+// ✅ APPROVER TASKS (เพิ่มให้ครบตามที่ frontend เรียก)
+// GET /api/approver/tasks
+// - ใช้ view v_approver_tasks ที่คุณสร้างไว้แล้ว
+// - ใช้ token verify ด้วย supabaseAdmin.auth.getUser(token)
+// ============================
+app.get("/api/approver/tasks", async (req, res) => {
+    try {
+        const u = await requireUser(req);
+        if (!u.ok) return res.status(u.status).json({ ok: false, message: u.message });
+
+        // ดึงงานจาก view
+        const { data, error } = await supabaseAdmin
+            .from("v_approver_tasks")
+            .select(
+                [
+                    "approval_id",
+                    "reservation_id",
+                    "stage_no",
+                    "status",
+                    "acted_at",
+                    "note",
+                    "room_name",
+                    "reserv_start",
+                    "reserv_end",
+                    "reserv_purp",
+                    "reserv_by_name",
+                    "acted_by_name",
+                    // fields เผื่อมีใน view
+                    "approver_name",
+                    "approver_pos",
+                ].join(",")
+            )
+            .order("reserv_start", { ascending: true });
+
+        if (error) return res.status(400).json({ ok: false, message: error.message });
+        return res.json({ ok: true, tasks: data || [] });
+    } catch (err) {
+        console.error(`[ERR ${req._reqId}] /api/approver/tasks`, err);
+        return res.status(500).json({ ok: false, message: err?.message || String(err) });
+    }
+});
+
+// ============================
+// ✅ RESERVATION: CREATE
 // POST /api/reservations/create
-// body accepted:
-// - snake_case: room_id, reserv_start, reserv_end, reserv_purp
-// - OR reserv_end_inclusive (frontend เก่า)
-// - OR camelCase: roomId, reservStart, reservEnd, reservPurp, reservEndInclusive
+// body: { room_id, reserv_start, reserv_end OR reserv_end_inclusive, reserv_purp }
+// รองรับสำรอง: roomId/reservStart/reservEnd/reservPurp (camelCase) และ reserv_end_inclusive
 // ============================
 app.post("/api/reservations/create", async (req, res) => {
     try {
@@ -130,7 +197,6 @@ app.post("/api/reservations/create", async (req, res) => {
         const room_id = body.room_id ?? body.roomId ?? null;
         const reserv_start = body.reserv_start ?? body.reservStart ?? null;
 
-        // ✅ รองรับทั้ง reserv_end และ reserv_end_inclusive
         const reserv_end =
             body.reserv_end ??
             body.reservEnd ??
@@ -149,7 +215,6 @@ app.post("/api/reservations/create", async (req, res) => {
             });
         }
 
-        // 1) ตรวจว่าห้องมีจริง (meeting_rooms ใช้ room_id)
         const { data: room, error: roomErr } = await supabaseAdmin
             .from("meeting_rooms")
             .select("room_id, room_name")
@@ -160,7 +225,6 @@ app.post("/api/reservations/create", async (req, res) => {
             return res.status(400).json({ ok: false, message: "Room not found (invalid room_id)" });
         }
 
-        // 2) Insert ใบจอง
         const insertPayload = {
             room_id,
             reserv_start,
@@ -177,102 +241,156 @@ app.post("/api/reservations/create", async (req, res) => {
 
         if (insErr) return res.status(400).json({ ok: false, message: insErr.message });
 
-        const reservId = inserted.reserv_id;
-
-        // 3) โหลด approver_chain ที่ is_active=true (มีเฉพาะ is_active ตามที่คุณแจ้ง)
-        const { data: chainAll, error: chainErr } = await supabaseAdmin
-            .from("approver_chain")
-            .select("stage_no, approver_id, is_active")
-            .order("stage_no", { ascending: true });
-
-        if (chainErr) {
-            return res.status(400).json({
-                ok: false,
-                message: `Load approver_chain failed: ${chainErr.message}`,
-            });
-        }
-
-        const chainRows = (chainAll || [])
-            .filter((r) => r.is_active === true)
-            .filter((r) => r.stage_no === 1 || r.stage_no === 2)
-            .sort((a, b) => (a.stage_no ?? 0) - (b.stage_no ?? 0));
-
-        if (chainRows.length < 2) {
-            return res.status(400).json({
-                ok: false,
-                message: "ระบบยังไม่มี Stage ครบ 2 ขั้น (ตรวจว่า approver_chain ตั้ง is_active ไว้ครบหรือยัง)",
-                chain_active_rows: chainRows,
-            });
-        }
-
-        const has1 = chainRows.some((r) => r.stage_no === 1 && r.approver_id);
-        const has2 = chainRows.some((r) => r.stage_no === 2 && r.approver_id);
-
-        if (!has1 || !has2) {
-            return res.status(400).json({
-                ok: false,
-                message: "approver_chain ต้องมี approver_id ครบทั้ง stage 1 และ stage 2",
-                chain_active_rows: chainRows,
-            });
-        }
-
-        // 4) ✅ กันซ้ำ: โหลด approvals ที่มีอยู่แล้วของ reservation นี้
-        const { data: existingApprovals, error: existErr } = await supabaseAdmin
-            .from("reservation_approvals")
-            .select("stage_no, approver_id")
-            .eq("reservation_id", reservId);
-
-        if (existErr) {
-            return res.status(400).json({
-                ok: false,
-                message: `Load existing approvals failed: ${existErr.message}`,
-            });
-        }
-
-        const existingSet = new Set(
-            (existingApprovals || []).map((r) => `${r.stage_no}:${r.approver_id}`)
-        );
-
-        // 5) Insert เฉพาะที่ยังไม่มี
-        const approvalsToInsert = chainRows
-            .filter((c) => !existingSet.has(`${c.stage_no}:${c.approver_id}`))
-            .map((c) => ({
-                reservation_id: reservId,
-                stage_no: c.stage_no,
-                approver_id: c.approver_id,
-                status: "PENDING",
-            }));
-
-        if (approvalsToInsert.length > 0) {
-            const { error: apprErr } = await supabaseAdmin
-                .from("reservation_approvals")
-                .insert(approvalsToInsert);
-
-            if (apprErr) {
-                return res.status(400).json({
-                    ok: false,
-                    message: `Create approvals failed: ${apprErr.message}`,
-                    approvalsToInsert,
-                });
-            }
-        }
-
-        return res.json({
-            ok: true,
-            reservation: inserted,
-            approvals_created: approvalsToInsert.length,
-            approvals_existing: (existingApprovals || []).length,
-        });
+        return res.json({ ok: true, reservation: inserted });
     } catch (err) {
+        console.error(`[ERR ${req._reqId}] /api/reservations/create`, err);
+        return res.status(500).json({ ok: false, message: err?.message || String(err) });
+    }
+});
+
+// ============================
+// ADMIN: USERS
+// ============================
+app.get("/api/admin/users", async (req, res) => {
+    try {
+        const auth = await requireAdmin(req);
+        if (!auth.ok) return res.status(auth.status).json({ ok: false, message: auth.message });
+
+        const perPage = 200;
+        let page = 1;
+        let all = [];
+
+        while (true) {
+            const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+            if (error) return res.status(500).json({ ok: false, message: error.message });
+
+            const batch = data?.users || [];
+            all = all.concat(batch);
+
+            if (batch.length < perPage) break;
+            page += 1;
+            if (page > 50) break;
+        }
+
+        const ids = all.map((u) => u.id);
+
+        const { data: profRows, error: pErr } = await supabaseAdmin
+            .from("profiles")
+            .select("id, first_name, last_name")
+            .in("id", ids);
+
+        if (pErr) return res.status(500).json({ ok: false, message: pErr.message });
+
+        const profMap = new Map();
+        (profRows || []).forEach((p) => profMap.set(p.id, p));
+
+        const users = all.map((u) => {
+            const p = profMap.get(u.id);
+            const first_name = p?.first_name || "";
+            const last_name = p?.last_name || "";
+            const full_from_profile = `${first_name}${last_name ? ` ${last_name}` : ""}`.trim();
+            const full_from_meta = u.user_metadata?.full_name || "";
+            const display_name = full_from_profile || full_from_meta || u.email || u.id;
+
+            return {
+                id: u.id,
+                email: u.email || null,
+                first_name: first_name || null,
+                last_name: last_name || null,
+                display_name,
+                created_at: u.created_at || null,
+            };
+        });
+
+        return res.json({ ok: true, users });
+    } catch (err) {
+        console.error(`[ERR ${req._reqId}] /api/admin/users`, err);
+        return res.status(500).json({ ok: false, message: err?.message || String(err) });
+    }
+});
+
+// ============================
+// ADMIN: APPROVERS
+// ============================
+app.get("/api/admin/approvers", async (req, res) => {
+    try {
+        const auth = await requireAdmin(req);
+        if (!auth.ok) return res.status(auth.status).json({ ok: false, message: auth.message });
+
+        const { data, error } = await supabaseAdmin
+            .from("approver_info")
+            .select("user_id, approv_name, approv_pos")
+            .order("approv_name", { ascending: true });
+
+        if (error) return res.status(400).json({ ok: false, message: error.message });
+        return res.json({ ok: true, approvers: data || [] });
+    } catch (err) {
+        console.error(`[ERR ${req._reqId}] /api/admin/approvers`, err);
+        return res.status(500).json({ ok: false, message: err?.message || String(err) });
+    }
+});
+
+app.post("/api/admin/approvers/upsert", async (req, res) => {
+    try {
+        const auth = await requireAdmin(req);
+        if (!auth.ok) return res.status(auth.status).json({ ok: false, message: auth.message });
+
+        const { user_id, approv_name, approv_pos } = req.body || {};
+        if (!user_id) return res.status(400).json({ ok: false, message: "Missing user_id" });
+        if (!approv_pos || !String(approv_pos).trim()) {
+            return res.status(400).json({ ok: false, message: "Missing approv_pos" });
+        }
+
+        const { data: prof, error: profErr } = await supabaseAdmin
+            .from("profiles")
+            .select("id, first_name, last_name")
+            .eq("id", user_id)
+            .single();
+
+        if (profErr || !prof) {
+            return res.status(400).json({
+                ok: false,
+                message: "User has no profile row in public.profiles (FK requires profiles.id).",
+            });
+        }
+
+        const fallbackName = `${prof.first_name || ""}${prof.last_name ? ` ${prof.last_name}` : ""}`.trim();
+        const nameToSave = String(approv_name || "").trim() || fallbackName || "(ไม่พบชื่อ)";
+
+        const { error } = await supabaseAdmin
+            .from("approver_info")
+            .upsert(
+                { user_id, approv_name: nameToSave, approv_pos: String(approv_pos).trim() },
+                { onConflict: "user_id" }
+            );
+
+        if (error) return res.status(400).json({ ok: false, message: error.message });
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error(`[ERR ${req._reqId}] /api/admin/approvers/upsert`, err);
+        return res.status(500).json({ ok: false, message: err?.message || String(err) });
+    }
+});
+
+app.delete("/api/admin/approvers/:userId", async (req, res) => {
+    try {
+        const auth = await requireAdmin(req);
+        if (!auth.ok) return res.status(auth.status).json({ ok: false, message: auth.message });
+
+        const userId = req.params.userId;
+        const { error } = await supabaseAdmin.from("approver_info").delete().eq("user_id", userId);
+        if (error) return res.status(400).json({ ok: false, message: error.message });
+
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error(`[ERR ${req._reqId}] /api/admin/approvers/:userId`, err);
         return res.status(500).json({ ok: false, message: err?.message || String(err) });
     }
 });
 
 // ============================
 // APPROVAL ACTION
-// POST /api/approvals/act
-// body: { approval_id, action: 'APPROVED'|'REJECTED', note? }
-// บันทึก acted_by_id + acted_by_name
+// (คงเส้นเดิมไว้ ไม่ลบทิ้ง)
 // ============================
 app.post("/api/approvals/act", async (req, res) => {
     try {
@@ -283,10 +401,11 @@ app.post("/api/approvals/act", async (req, res) => {
         const { approval_id, action, note } = req.body || {};
 
         if (!approval_id) return res.status(400).json({ ok: false, message: "Missing approval_id" });
-        if (!["APPROVED", "REJECTED"].includes(action)) {
+        if (!["APPROVED", "REJECTED"].includes(String(action || "").toUpperCase())) {
             return res.status(400).json({ ok: false, message: "Invalid action (must be APPROVED or REJECTED)" });
         }
-        if (action === "REJECTED" && (!note || !String(note).trim())) {
+        const act = String(action || "").toUpperCase();
+        if (act === "REJECTED" && (!note || !String(note).trim())) {
             return res.status(400).json({ ok: false, message: "Reject requires a reason (note)" });
         }
 
@@ -304,7 +423,7 @@ app.post("/api/approvals/act", async (req, res) => {
             return res.status(400).json({ ok: false, message: "This task is already finalized" });
         }
 
-        if (approvalRow.stage_no === 2) {
+        if (Number(approvalRow.stage_no) === 2) {
             const { data: st1, error: st1Err } = await supabaseAdmin
                 .from("reservation_approvals")
                 .select("status")
@@ -327,7 +446,7 @@ app.post("/api/approvals/act", async (req, res) => {
         const approverName = buildDisplayName({ profileRow: approverProfile, authUser: approverUser });
 
         const payload = {
-            status: action,
+            status: act,
             acted_at: new Date().toISOString(),
             note: note ? String(note).trim() : null,
             acted_by_id: approverUser.id,
@@ -343,7 +462,7 @@ app.post("/api/approvals/act", async (req, res) => {
 
         if (uErr) return res.status(400).json({ ok: false, message: uErr.message });
 
-        // ส่งอีเมล (optional)
+        // (คง logic email เดิมไว้)
         let emailed = false;
         try {
             const { data: rRow } = await supabaseAdmin
@@ -364,14 +483,16 @@ app.post("/api/approvals/act", async (req, res) => {
 
                 if (requesterEmail && process.env.RESEND_API_KEY && process.env.MAIL_FROM) {
                     const subject =
-                        action === "APPROVED"
+                        act === "APPROVED"
                             ? `ผลการอนุมัติการจองห้องประชุม: อนุมัติ (Stage ${approvalRow.stage_no})`
                             : `ผลการอนุมัติการจองห้องประชุม: ไม่อนุมัติ (Stage ${approvalRow.stage_no})`;
 
                     const reasonLine =
-                        action === "REJECTED"
+                        act === "REJECTED"
                             ? `เหตุผล: ${payload.note || "-"}`
-                            : (payload.note ? `หมายเหตุ: ${payload.note}` : "");
+                            : payload.note
+                                ? `หมายเหตุ: ${payload.note}`
+                                : "";
 
                     const text = [
                         `ใบจอง: ${rRow.reserv_id}`,
@@ -379,9 +500,11 @@ app.post("/api/approvals/act", async (req, res) => {
                         `ช่วงวัน: ${rRow.reserv_start} ถึง ${rRow.reserv_end}`,
                         `เหตุผลการจอง: ${rRow.reserv_purp || "-"}`,
                         `ผู้อนุมัติ: ${approverName}`,
-                        `ผลการพิจารณา: ${action}`,
+                        `ผลการพิจารณา: ${act}`,
                         reasonLine,
-                    ].filter(Boolean).join("\n");
+                    ]
+                        .filter(Boolean)
+                        .join("\n");
 
                     await sendEmailResend({ to: requesterEmail, subject, text });
                     emailed = true;
@@ -393,6 +516,7 @@ app.post("/api/approvals/act", async (req, res) => {
 
         return res.json({ ok: true, approval: updated, emailed });
     } catch (err) {
+        console.error(`[ERR ${req._reqId}] /api/approvals/act`, err);
         return res.status(500).json({ ok: false, message: err?.message || String(err) });
     }
 });
@@ -403,7 +527,7 @@ app.post("/api/approvals/act", async (req, res) => {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// CRA build folder (ปรับถ้าใช้ Vite เป็น dist)
+// CRA: build / Vite: dist (ปรับตามของคุณ)
 const reactBuildDir = path.join(__dirname, "..", "build");
 
 app.use(express.static(reactBuildDir));

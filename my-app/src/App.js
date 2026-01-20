@@ -1,18 +1,20 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import { supabase } from './supabaseClient';
-import LoginPage from './login';
-import EditProfilePage from './EditProfilePage';
-import RegisterPage from './register';
-import ReservationFormPage from './ReservationFormPage';
-import AdminApproverPage from './AdminApproverPage';
-import AddMeetingRoomPage from './AddMeetingRoomPage';
-import MeetingRoomsListPage from './MeetingRoomsListPage';
-import ReservationCalendarPage from './ReservationCalendarPage';
-import MyReservationsPage from './MyReservationsPage';
-import ReservationDetailPage from './ReservationDetailPage';
-import ApproverDashboardPage from './ApproverDashboardPage';
-import DevHomePage from './DevHomePage';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { supabase } from "./supabaseClient";
+
+import LoginPage from "./login";
+import EditProfilePage from "./EditProfilePage";
+import RegisterPage from "./register";
+import ReservationFormPage from "./ReservationFormPage";
+import AdminApproverPage from "./AdminApproverPage";
+import AddMeetingRoomPage from "./AddMeetingRoomPage";
+import MeetingRoomsListPage from "./MeetingRoomsListPage";
+import ReservationCalendarPage from "./ReservationCalendarPage";
+import MyReservationsPage from "./MyReservationsPage";
+import ReservationDetailPage from "./ReservationDetailPage";
+import ApproverDashboardPage from "./ApproverDashboardPage";
+import DevHomePage from "./DevHomePage";
+import ReservationProgressPage from "./ReservationProgressPage";
 
 function App() {
   const [session, setSession] = useState(null);
@@ -24,68 +26,38 @@ function App() {
       setLoading(false);
     });
 
-    const { data: { subscription } } =
-      supabase.auth.onAuthStateChange((_event, session) => {
-        setSession(session);
-        setLoading(false);
-      });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setLoading(false);
+    });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  if (loading) return null; // ⭐ จุดแก้หลัก
+  if (loading) return null;
 
   return (
     <BrowserRouter>
       <Routes>
-        <Route
-          path="/login"
-          element={!session ? <LoginPage /> : <Navigate to="/edit-profile" />}
-        />
-        <Route
-          path="/edit-profile"
-          element={session ? <EditProfilePage session={session} /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/register"
-          element={!session ? <RegisterPage /> : <Navigate to="/edit-profile" />}
-        />
-        <Route
-          path="/reservation-form"
-          element={session ? <ReservationFormPage session={session} /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/admin/approvers"
-          element={session ? <AdminApproverPage /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/admin/add-room"
-          element={session ? <AddMeetingRoomPage /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/rooms"
-          element={session ? <MeetingRoomsListPage /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/reserve-calendar"
-          element={session ? <ReservationCalendarPage /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/my-reservations"
-          element={session ? <MyReservationsPage /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/reservation/:reservId"
-          element={session ? <ReservationDetailPage /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/approver"
-          element={session ? <ApproverDashboardPage /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/dev"
-          element={session ? <DevHomePage /> : <Navigate to="/login" />}
-        />
+        <Route path="/login" element={!session ? <LoginPage /> : <Navigate to="/edit-profile" />} />
+        <Route path="/edit-profile" element={session ? <EditProfilePage session={session} /> : <Navigate to="/login" />} />
+        <Route path="/register" element={!session ? <RegisterPage /> : <Navigate to="/edit-profile" />} />
+
+        <Route path="/reservation-form" element={session ? <ReservationFormPage session={session} /> : <Navigate to="/login" />} />
+        <Route path="/reserve-calendar" element={session ? <ReservationCalendarPage /> : <Navigate to="/login" />} />
+
+        <Route path="/rooms" element={session ? <MeetingRoomsListPage /> : <Navigate to="/login" />} />
+        <Route path="/my-reservations" element={session ? <MyReservationsPage /> : <Navigate to="/login" />} />
+
+        <Route path="/reservation/:reservId" element={session ? <ReservationDetailPage /> : <Navigate to="/login" />} />
+        <Route path="/reservation/:reservId/progress" element={session ? <ReservationProgressPage /> : <Navigate to="/login" />} />
+
+        <Route path="/approver" element={session ? <ApproverDashboardPage /> : <Navigate to="/login" />} />
+
+        <Route path="/admin/approvers" element={session ? <AdminApproverPage /> : <Navigate to="/login" />} />
+        <Route path="/admin/add-room" element={session ? <AddMeetingRoomPage /> : <Navigate to="/login" />} />
+
+        <Route path="/dev" element={session ? <DevHomePage /> : <Navigate to="/login" />} />
 
         <Route path="/" element={<Navigate to="/login" />} />
       </Routes>
