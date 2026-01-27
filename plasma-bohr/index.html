@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>plasma-bohr</title>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script>
+    window.onerror = function (message, source, lineno, colno, error) {
+      const errorBox = document.createElement('div');
+      errorBox.style.position = 'fixed';
+      errorBox.style.top = '0';
+      errorBox.style.left = '0';
+      errorBox.style.width = '100%';
+      errorBox.style.padding = '20px';
+      errorBox.style.background = '#fee2e2';
+      errorBox.style.color = '#991b1b';
+      errorBox.style.zIndex = '9999';
+      errorBox.style.fontFamily = 'monospace';
+      errorBox.style.whiteSpace = 'pre-wrap';
+      errorBox.style.borderBottom = '1px solid #7f1d1d';
+      errorBox.innerText = 'Global Error:\n' + message + '\nAt: ' + source + ':' + lineno + ':' + colno;
+      document.body.appendChild(errorBox);
+    };
+  </script>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>
