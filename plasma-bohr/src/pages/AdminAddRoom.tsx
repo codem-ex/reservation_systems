@@ -19,17 +19,20 @@ type ProfileAdmin = {
 
 type RoomImage = { path: string; url: string };
 
+// ✅ amenities jsonb: เก็บเป็น array ของ string (ง่ายสุดกับ UI)
+// ถ้าคุณอยากเก็บเป็น object { "ไมค์": true } ก็ทำได้ แต่ตอนนี้ทำเป็น array
 type RoomInsert = {
     name: string;
     location: string | null;
     capacity: number;
     status: string;
-    description: string | null;
+    description: string | null; // ✅ รายละเอียดห้อง/ความเป็นมา/เหมาะกับอะไร
+    amenities: string[]; // ✅ อุปกรณ์: ลำโพง/ไมค์/โปรเจคเตอร์ ฯลฯ
     images: RoomImage[];
 };
 
 const BUCKET = "room-images";
-const DRAFT_KEY = "draft:adminAddRoom:v2";
+const DRAFT_KEY = "draft:adminAddRoom:v3"; // ✅ bump version
 
 function getExtFromFile(file: File) {
     const byName = (file.name.split(".").pop() || "").toLowerCase();
@@ -49,6 +52,15 @@ function maskErr(e: any) {
     return e?.message ?? "Unknown error";
 }
 
+// ✅ แปลงข้อความ amenities จาก textarea -> string[]
+// รองรับคั่นด้วย , หรือขึ้นบรรทัด
+function parseAmenities(text: string): string[] {
+    return text
+        .split(/[\n,]+/g)
+        .map((s) => s.trim())
+        .filter(Boolean);
+}
+
 export default function AdminAddRoom() {
     const { user, loading } = useAuth();
     const nav = useNavigate();
@@ -60,7 +72,12 @@ export default function AdminAddRoom() {
     const [location, setLocation] = useState("");
     const [capacity, setCapacity] = useState<number>(10);
     const [status, setStatus] = useState("available");
+
+    // ✅ description = รายละเอียดห้อง
     const [description, setDescription] = useState("");
+
+    // ✅ amenities input (human-friendly)
+    const [amenitiesText, setAmenitiesText] = useState("");
 
     const [imageFiles, setImageFiles] = useState<File[]>([]);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -108,7 +125,10 @@ export default function AdminAddRoom() {
             if (typeof d.location === "string") setLocation(d.location);
             if (typeof d.capacity === "number") setCapacity(d.capacity);
             if (typeof d.status === "string") setStatus(d.status);
+
+            // ✅ restore description + amenitiesText
             if (typeof d.description === "string") setDescription(d.description);
+            if (typeof d.amenitiesText === "string") setAmenitiesText(d.amenitiesText);
         } catch {
             // ignore
         }
@@ -123,10 +143,11 @@ export default function AdminAddRoom() {
             capacity,
             status,
             description,
+            amenitiesText,
             updatedAt: Date.now(),
         };
         sessionStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
-    }, [name, location, capacity, status, description]);
+    }, [name, location, capacity, status, description, amenitiesText]);
 
     // ===== Cleanup previews on unmount =====
     useEffect(() => {
@@ -222,6 +243,9 @@ export default function AdminAddRoom() {
             return;
         }
 
+        // ✅ parse amenities
+        const amenities = parseAmenities(amenitiesText);
+
         setBusy(true);
         try {
             // 1) insert room first (get id)
@@ -230,7 +254,10 @@ export default function AdminAddRoom() {
                 location: location.trim() ? location.trim() : null,
                 capacity: Number(capacity),
                 status,
+                // ✅ description = รายละเอียดห้อง
                 description: description.trim() ? description.trim() : null,
+                // ✅ amenities jsonb
+                amenities,
                 images: [],
             };
 
@@ -428,15 +455,35 @@ export default function AdminAddRoom() {
                                     </select>
                                 </div>
 
+                                {/* ✅ description = รายละเอียดห้อง */}
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">รายละเอียด</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        รายละเอียดห้อง (ความเป็นมา/เหมาะกับอะไร)
+                                    </label>
                                     <textarea
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
-                                        placeholder="เช่น โปรเจคเตอร์ / ไมค์ / โต๊ะประชุม"
+                                        placeholder="อธิบายห้องนี้คืออะไร ความเป็นมาอย่างไร เหมาะกับการใช้งานแบบไหน เช่น ประชุมคณะ, อบรม, สัมมนา..."
                                         rows={4}
                                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                                     />
+                                </div>
+
+                                {/* ✅ amenities jsonb */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Amenities / อุปกรณ์ในห้อง (เก็บลง amenities jsonb)
+                                    </label>
+                                    <textarea
+                                        value={amenitiesText}
+                                        onChange={(e) => setAmenitiesText(e.target.value)}
+                                        placeholder={`พิมพ์รายการอุปกรณ์ เช่น\n- โปรเจคเตอร์\n- ไมโครโฟน\n- ลำโพง\n- กระดานไวท์บอร์ด\n\nคั่นด้วยคอมม่า หรือขึ้นบรรทัดก็ได้`}
+                                        rows={4}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                                    />
+                                    <div className="mt-2 text-xs text-gray-500">
+                                        ระบบจะบันทึกเป็น array เช่น <code className="px-1 bg-gray-100 rounded">["โปรเจคเตอร์","ไมโครโฟน"]</code>
+                                    </div>
                                 </div>
                             </div>
 
