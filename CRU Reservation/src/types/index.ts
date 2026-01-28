@@ -28,12 +28,20 @@ export type BookingStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
 export interface Booking {
     id: string;
+
     roomId: string;
     userId: string;
-    startTime: string; // ISO string
-    endTime: string; // ISO string
+
+    start_at: string;
+    end_at: string;
+
+    setup_date?: string | null;
+    setup_start?: string | null;
+    setup_end?: string | null;
+
     purpose: string;
-    status: BookingStatus;
-    approvedBy?: string; // User ID of approver
-    createdAt: string;
+    status: string;
+
+    created_at: string;
 }
+
