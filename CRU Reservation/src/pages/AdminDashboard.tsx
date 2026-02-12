@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, X, Clock as ClockIcon, Calendar, MessageSquare } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Check, X, Clock as ClockIcon, Calendar, MessageSquare, Plus, Edit2, LayoutGrid } from "lucide-react";
 import { format } from "date-fns";
 
 import { useAuth } from "../lib/auth";
@@ -41,7 +42,13 @@ type ReservationRow = {
     setup_start: string | null;
     setup_end: string | null;
     setup_start_at: string | null;
-    setup_end_at: string | null;
+    setup_end_at?: string;
+    reservation_approvals?: {
+        id: string;
+        stage_no: number;
+        approver_user_id: string;
+        decision: string;
+    }[];
 };
 
 type ChainStep = {
@@ -83,6 +90,9 @@ const AdminDashboard = () => {
     const [profiles, setProfiles] = useState<ProfileRow[]>([]);
     const [steps, setSteps] = useState<ChainStep[]>([]);
     const [errorMsg, setErrorMsg] = useState("");
+    const [activeTab, setActiveTab] = useState<"reservations" | "rooms" | "reports">("reservations");
+    const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+
 
     // reject modal
     const [rejectOpen, setRejectOpen] = useState(false);
@@ -146,7 +156,7 @@ const AdminDashboard = () => {
                 supabase
                     .from("reservations")
                     .select(
-                        "id,room_id,requester_id,title,purpose,start_at,end_at,status,current_stage,chain_id,setup_date,setup_start,setup_end,setup_start_at,setup_end_at"
+                        "*, reservation_approvals(id, stage_no, approver_user_id, decision)"
                     )
                     .order("created_at", { ascending: false }),
 
@@ -230,18 +240,30 @@ const AdminDashboard = () => {
 
     // โหมด: admin เห็นทั้งหมด / approver เห็นเฉพาะงานที่เป็น stage ของตัวเอง
     const visiblePendingRows = useMemo(() => {
-        const pending = uiRows.filter((x) => x.r.status === "PENDING");
+        // กรองรายการที่ PENDING และไม่อยู่ในระหว่างประมวลผล (Optimistic Hide)
+        const pending = uiRows.filter((x) => x.r.status === "PENDING" && !processingIds.has(x.r.id));
 
-        if (isAdmin) return pending;
+        // กรองออก: รายการที่ "ตัวเรา" (ผู้นำหรือแอดมิน) เคยร่วมตัดสินใจใน Stage ปัจจุบันไปแล้ว
+        // เพื่อแก้ปัญหา "กดแล้วไม่หาย" แม้ DB trigger จะยังไม่เปลี่ยน Status/Stage
+        const userId = supabaseUser?.id;
+        const needsAction = pending.filter((x) => {
+            if (!userId) return false;
+            const approvals = (x.r as any).reservation_approvals || [];
+            const alreadyActed = approvals.some(
+                (a: any) => a.stage_no === x.r.current_stage && a.approver_user_id === userId
+            );
+            return !alreadyActed;
+        });
+
+        if (isAdmin) return needsAction;
 
         // approver: เห็นเฉพาะงานที่ chain_id มีและ stage ปัจจุบันเป็นของ user
-        return pending.filter((x) => {
-            if (!supabaseUser?.id) return false;
-            if (!x.r.chain_id) return false;
+        return needsAction.filter((x) => {
+            if (!userId || !x.r.chain_id) return false;
             const s = stepByChainAndStage.get(stepKey(x.r.chain_id, x.r.current_stage));
-            return !!s && s.approver_user_id === supabaseUser.id;
+            return !!s && s.approver_user_id === userId;
         });
-    }, [uiRows, isAdmin, supabaseUser?.id, stepByChainAndStage]);
+    }, [uiRows, isAdmin, supabaseUser?.id, stepByChainAndStage, processingIds]);
 
     const pastRows = useMemo(() => {
         // admin เห็น history ทั้งหมด / approver เห็น history เฉพาะที่เกี่ยวกับตัวเองก็ได้
@@ -279,10 +301,10 @@ const AdminDashboard = () => {
 
     const approve = async (row: RowUI) => {
         if (!supabaseUser?.id) return;
+        const r = row.r;
+        if (processingIds.has(r.id)) return;
 
         try {
-            const r = row.r;
-
             // gating (non-admin)
             if (!isAdmin) {
                 if (!r.chain_id) {
@@ -296,6 +318,9 @@ const AdminDashboard = () => {
                 }
             }
 
+            // Optimistic update: hide the row and disable buttons
+            setProcessingIds(prev => new Set(prev).add(r.id));
+
             await insertApprovalLog({
                 reservation_id: r.id,
                 chain_id: r.chain_id,
@@ -304,9 +329,50 @@ const AdminDashboard = () => {
                 decision: "APPROVED",
             });
 
-            await loadAll();
+            // ✅ Notify the requester about the approval
+            const requesterId = r.requester_id;
+            const roomName = row.room?.name || "ห้องประชุม";
+
+            // Check if this was the final stage or if it's still pending
+            const { data: updatedRes } = await supabase
+                .from("reservations")
+                .select("status, current_stage")
+                .eq("id", r.id)
+                .single();
+
+            const isFullyApproved = updatedRes?.status === "APPROVED";
+
+            await supabase.from("notifications").insert({
+                user_id: requesterId,
+                title: isFullyApproved ? "คำขอจองห้องได้รับการอนุมัติแล้ว" : `คำขอจองห้องผ่านการอนุมัติขั้นที่ ${r.current_stage}`,
+                message: isFullyApproved
+                    ? `คำขอใช้ห้อง "${roomName}" หัวข้อ "${r.title}" ได้รับการอนุมัติครบทุกขั้นตอนแล้ว`
+                    : `คำขอใช้ห้อง "${roomName}" หัวข้อ "${r.title}" ผ่านการอนุมัติในขั้นที่ ${r.current_stage} แล้ว ขณะนี้รอการอนุมัติในขั้นถัดไป`,
+                type: isFullyApproved ? 'reservation_approved' : 'approval_update',
+                is_read: false
+            });
+
+            // Small delay to allow DB triggers to finish updating reservation status
+            setTimeout(async () => {
+                await loadAll();
+                setProcessingIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(r.id);
+                    return next;
+                });
+            }, 2000);
         } catch (e: any) {
-            alert(e.message);
+            if (e.message?.includes("uq_ra_resv_stage_approver")) {
+                alert("รายการนี้ได้รับการดำเนินการไปก่อนหน้านี้แล้ว ระบบจะอัปเดตข้อมูลให้ใหม่");
+                loadAll();
+            } else {
+                alert("เกิดข้อผิดพลาด: " + e.message);
+            }
+            setProcessingIds(prev => {
+                const next = new Set(prev);
+                next.delete(r.id);
+                return next;
+            });
         }
     };
 
@@ -318,6 +384,8 @@ const AdminDashboard = () => {
 
     const confirmReject = async () => {
         if (!supabaseUser?.id || !rejectTarget) return;
+        const r = rejectTarget.r;
+        if (processingIds.has(r.id)) return;
 
         const reason = rejectReason.trim();
         if (!reason) {
@@ -326,8 +394,6 @@ const AdminDashboard = () => {
         }
 
         try {
-            const r = rejectTarget.r;
-
             // gating (non-admin)
             if (!isAdmin) {
                 if (!r.chain_id) {
@@ -341,22 +407,62 @@ const AdminDashboard = () => {
                 }
             }
 
+            // Optimistic update: hide the row and disable buttons
+            setProcessingIds(prev => new Set(prev).add(r.id));
+
             await insertApprovalLog({
                 reservation_id: r.id,
                 chain_id: r.chain_id,
                 stage_no: r.current_stage,
                 approver_user_id: supabaseUser.id,
                 decision: "REJECTED",
-                decision_note: reason, // ✅ บังคับเหตุผล (DB ก็ check อีกชั้น)
+                decision_note: reason,
+            });
+
+            // ✅ Explicitly set reservation status to REJECTED to free up the time slot 
+            // even if the trigger hasn't run or isn't designed for multi-stage rejection-to-global-status
+            await supabase
+                .from("reservations")
+                .update({ status: "REJECTED" })
+                .eq("id", r.id);
+
+            // ✅ Notify the requester about the rejection
+            const requesterId = r.requester_id;
+            const roomName = rejectTarget.room?.name || "ห้องประชุม";
+
+            await supabase.from("notifications").insert({
+                user_id: requesterId,
+                title: "คำขอจองห้องของคุณถูกปฏิเสธ",
+                message: `คำขอใช้ห้อง "${roomName}" หัวข้อ "${r.title}" ไม่ผ่านการอนุมัติ\nเหตุผล: ${reason}`,
+                type: 'reservation_rejected',
+                is_read: false
             });
 
             setRejectOpen(false);
             setRejectTarget(null);
             setRejectReason("");
 
-            await loadAll();
+            setTimeout(async () => {
+                await loadAll();
+                setProcessingIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(r.id);
+                    return next;
+                });
+            }, 2000);
         } catch (e: any) {
-            alert(e.message);
+            if (e.message?.includes("uq_ra_resv_stage_approver")) {
+                alert("รายการนี้ได้รับการดำเนินการไปก่อนหน้านี้แล้ว ระบบจะอัปเดตข้อมูลให้ใหม่");
+                setRejectOpen(false);
+                loadAll();
+            } else {
+                alert("เกิดข้อผิดพลาด: " + e.message);
+            }
+            setProcessingIds(prev => {
+                const next = new Set(prev);
+                next.delete(r.id);
+                return next;
+            });
         }
     };
 
@@ -412,143 +518,270 @@ const AdminDashboard = () => {
 
     return (
         <div className="space-y-8">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">
-                        {isAdmin ? "Admin Dashboard" : "Approver Dashboard"}
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {isAdmin ? "แดชบอร์ดผู้ดูเแลระบบ" : "แดชบอร์ดผู้อนุมัติ"}
                     </h1>
-                    <div className="text-xs text-gray-500 mt-1">
-                        Signed in: <b>{supabaseUser.email ?? supabaseUser.id}</b>
+                    <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                        Signed in: <b className="text-slate-900 dark:text-white">{supabaseUser.email ?? supabaseUser.id}</b>
                     </div>
                 </div>
 
-                <button
-                    onClick={loadAll}
-                    className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-sm font-medium"
-                >
-                    Refresh
-                </button>
-            </div>
-
-            {/* Pending */}
-            <section>
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                    <ClockIcon className="w-5 h-5 mr-2 text-yellow-500" />
-                    Pending Approvals ({visiblePendingRows.length})
-                </h2>
-
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    {visiblePendingRows.length === 0 ? (
-                        <div className="p-6 text-center text-gray-500">
-                            {isAdmin ? "No pending requests." : "ยังไม่มีรายการรออนุมัติของคุณ"}
-                        </div>
-                    ) : (
-                        <div className="divide-y divide-slate-100">
-                            {visiblePendingRows.map((row) => {
-                                const r = row.r;
-                                const room = row.room;
-                                const user = row.requester;
-
-                                const currentStep =
-                                    r.chain_id ? stepByChainAndStage.get(stepKey(r.chain_id, r.current_stage)) : null;
-
-                                const approverProfile =
-                                    currentStep ? profileById.get(currentStep.approver_user_id) : null;
-
-                                const canAct =
-                                    isAdmin ||
-                                    (!!currentStep && currentStep.approver_user_id === supabaseUser.id);
-
-                                return (
-                                    <div
-                                        key={r.id}
-                                        className="p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-                                    >
-                                        <div className="min-w-0">
-                                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                                                <span className="font-bold text-gray-900">{room?.name ?? "-"}</span>
-                                                <span className="text-gray-400">•</span>
-                                                <span className="text-primary-600 font-medium">
-                                                    {user?.display_name ?? user?.email ?? r.requester_id}
-                                                </span>
-                                                <span className="text-gray-400">•</span>
-                                                <span className="text-xs bg-slate-100 px-2 py-0.5 rounded">
-                                                    Stage {r.current_stage}
-                                                </span>
-
-                                                {approverProfile && (
-                                                    <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
-                                                        ผู้อนุมัติขั้นนี้: {approverProfile.display_name ?? approverProfile.email}
-                                                    </span>
-                                                )}
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() => openTimeline(row)}
-                                                    className="ml-0 lg:ml-2 text-xs px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 flex items-center gap-1"
-                                                >
-                                                    <MessageSquare className="w-4 h-4" />
-                                                    Timeline
-                                                </button>
-                                            </div>
-
-                                            <p className="text-gray-600 text-sm mb-2">
-                                                <b className="text-gray-800">{r.title}</b> — {r.purpose}
-                                            </p>
-
-                                            <div className="flex flex-wrap items-center text-sm text-gray-500 gap-4">
-                                                <span className="flex items-center">
-                                                    <Calendar className="w-4 h-4 mr-1.5" />
-                                                    {format(new Date(r.start_at), "dd/MM/yyyy")}
-                                                </span>
-
-                                                <span className="flex items-center">
-                                                    <ClockIcon className="w-4 h-4 mr-1.5" />
-                                                    {format(new Date(r.start_at), "HH:mm")} - {format(new Date(r.end_at), "HH:mm")}
-                                                </span>
-
-                                                {r.setup_start_at && r.setup_end_at && (
-                                                    <span className="text-xs bg-yellow-50 text-yellow-800 px-2 py-0.5 rounded border border-yellow-200">
-                                                        Setup: {format(new Date(r.setup_start_at), "dd/MM HH:mm")} -{" "}
-                                                        {format(new Date(r.setup_end_at), "dd/MM HH:mm")}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="flex gap-2">
-                                            <button
-                                                disabled={!canAct}
-                                                onClick={() => approve(row)}
-                                                className={`flex items-center px-4 py-2 rounded-lg transition ${canAct ? "bg-green-600 text-white hover:bg-green-700" : "bg-slate-200 text-slate-500 cursor-not-allowed"
-                                                    }`}
-                                            >
-                                                <Check className="w-4 h-4 mr-2" />
-                                                Approve
-                                            </button>
-
-                                            <button
-                                                disabled={!canAct}
-                                                onClick={() => openReject(row)}
-                                                className={`flex items-center px-4 py-2 rounded-lg transition ${canAct ? "bg-red-100 text-red-700 hover:bg-red-200" : "bg-slate-200 text-slate-500 cursor-not-allowed"
-                                                    }`}
-                                            >
-                                                <X className="w-4 h-4 mr-2" />
-                                                Reject
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                <div className="flex gap-2">
+                    <button
+                        onClick={loadAll}
+                        className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-sm font-medium text-slate-700 dark:text-slate-200 transition-colors"
+                    >
+                        รีเฟรช
+                    </button>
+                    {isAdmin && (
+                        <Link
+                            to="/admin/rooms/new"
+                            className="px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 text-sm font-medium flex items-center gap-2 transition-colors shadow-lg shadow-primary-200 dark:shadow-none"
+                        >
+                            <Plus className="w-4 h-4" /> เพิ่มห้องประชุม
+                        </Link>
                     )}
                 </div>
-            </section>
+            </div>
+
+            {/* Admin Tabs */}
+            {isAdmin && (
+                <div className="flex border-b border-slate-200 dark:border-slate-800">
+                    <button
+                        onClick={() => setActiveTab("reservations")}
+                        className={`px-6 py-3 font-semibold transition-colors ${activeTab === 'reservations' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
+                    >
+                        การจอง
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("rooms")}
+                        className={`px-6 py-3 font-semibold transition-colors ${activeTab === 'rooms' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
+                    >
+                        รายชื่อห้องประชุม
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("reports")}
+                        className={`px-6 py-3 font-semibold transition-colors ${activeTab === 'reports' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
+                    >
+                        รายงานและสถิติ
+                    </button>
+                </div>
+            )}
+
+            {activeTab === "reservations" && (
+                <>
+                    {/* Pending */}
+                    <section>
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                            <ClockIcon className="w-5 h-5 mr-2 text-yellow-500" />
+                            รายการรออนุมัติ ({visiblePendingRows.length})
+                        </h2>
+
+
+                        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors">
+                            {visiblePendingRows.length === 0 ? (
+                                <div className="p-6 text-center text-gray-500">
+                                    {isAdmin ? "No pending requests." : "ยังไม่มีรายการรออนุมัติของคุณ"}
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-slate-100">
+                                    {visiblePendingRows.map((row) => {
+                                        const r = row.r;
+                                        const room = row.room;
+                                        const user = row.requester;
+
+                                        const currentStep =
+                                            r.chain_id ? stepByChainAndStage.get(stepKey(r.chain_id, r.current_stage)) : null;
+
+                                        const approverProfile =
+                                            currentStep ? profileById.get(currentStep.approver_user_id) : null;
+
+                                        const canAct =
+                                            isAdmin ||
+                                            (!!currentStep && currentStep.approver_user_id === supabaseUser.id);
+
+                                        return (
+                                            <div
+                                                key={r.id}
+                                                className="p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                                            >
+                                                <div className="min-w-0">
+                                                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                                                        <span className="font-bold text-gray-900">{room?.name ?? "-"}</span>
+                                                        <span className="text-gray-400">•</span>
+                                                        <span className="text-primary-600 font-medium">
+                                                            {user?.display_name ?? user?.email ?? r.requester_id}
+                                                        </span>
+                                                        <span className="text-gray-400">•</span>
+                                                        <span className="text-xs bg-slate-100 px-2 py-0.5 rounded">
+                                                            Stage {r.current_stage}
+                                                        </span>
+
+                                                        {approverProfile && (
+                                                            <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
+                                                                ผู้อนุมัติขั้นนี้: {approverProfile.display_name ?? approverProfile.email}
+                                                            </span>
+                                                        )}
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openTimeline(row)}
+                                                            className="ml-0 lg:ml-2 text-xs px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 flex items-center gap-1"
+                                                        >
+                                                            <MessageSquare className="w-4 h-4" />
+                                                            Timeline
+                                                        </button>
+                                                    </div>
+
+                                                    <p className="text-gray-600 text-sm mb-2">
+                                                        <b className="text-gray-800">{r.title}</b> — {r.purpose}
+                                                    </p>
+
+                                                    <div className="flex flex-wrap items-center text-sm text-gray-500 gap-4">
+                                                        <span className="flex items-center">
+                                                            <Calendar className="w-4 h-4 mr-1.5" />
+                                                            {format(new Date(r.start_at), "dd/MM/yyyy")}
+                                                        </span>
+
+                                                        <span className="flex items-center">
+                                                            <ClockIcon className="w-4 h-4 mr-1.5" />
+                                                            {format(new Date(r.start_at), "HH:mm")} - {format(new Date(r.end_at), "HH:mm")}
+                                                        </span>
+
+                                                        {r.setup_start_at && r.setup_end_at && (
+                                                            <span className="text-xs bg-yellow-50 text-yellow-800 px-2 py-0.5 rounded border border-yellow-200">
+                                                                Setup: {format(new Date(r.setup_start_at), "dd/MM HH:mm")} -{" "}
+                                                                {format(new Date(r.setup_end_at), "dd/MM HH:mm")}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        disabled={!canAct || processingIds.has(r.id)}
+                                                        onClick={() => approve(row)}
+                                                        className={`flex items-center px-4 py-2 rounded-lg transition ${canAct && !processingIds.has(r.id) ? "bg-green-600 text-white hover:bg-green-700" : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                                                            }`}
+                                                    >
+                                                        <Check className="w-4 h-4 mr-2" />
+                                                        {processingIds.has(r.id) ? "กำลังบันทึก..." : "อนุมัติ"}
+                                                    </button>
+
+                                                    <button
+                                                        disabled={!canAct || processingIds.has(r.id)}
+                                                        onClick={() => openReject(row)}
+                                                        className={`flex items-center px-4 py-2 rounded-lg transition ${canAct && !processingIds.has(r.id) ? "bg-red-100 text-red-700 hover:bg-red-200" : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                                                            }`}
+                                                    >
+                                                        <X className="w-4 h-4 mr-2" />
+                                                        ปฏิเสธ
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </section>
+                </>
+            )}
+
+            {activeTab === "rooms" && isAdmin && (
+                <section>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                        <LayoutGrid className="w-5 h-5 mr-2 text-indigo-500" />
+                        จัดการห้องประชุม ({rooms.length})
+                    </h2>
+                    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50 dark:bg-slate-800/50">
+                                    <th className="p-4 text-sm font-semibold">ชื่อห้อง</th>
+                                    <th className="p-4 text-sm font-semibold">สถานที่</th>
+                                    <th className="p-4 text-sm font-semibold text-center">ความจุ</th>
+                                    <th className="p-4 text-sm font-semibold">สถานะ</th>
+                                    <th className="p-4 text-sm font-semibold text-right">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {rooms.map(room => (
+                                    <tr key={room.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                                        <td className="p-4 text-sm font-medium">{room.name}</td>
+                                        <td className="p-4 text-sm text-gray-500">{(room as any).location || "-"}</td>
+                                        <td className="p-4 text-sm text-center">{(room as any).capacity || "-"}</td>
+                                        <td className="p-4 text-sm">
+                                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase
+                                                ${(room as any).status === 'available' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                {(room as any).status || 'unknown'}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-right">
+                                            <Link
+                                                to={`/admin/rooms/edit/${room.id}`}
+                                                className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium text-sm"
+                                            >
+                                                <Edit2 className="w-3 h-3" /> แก้ไข
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            )}
+
+            {activeTab === "reports" && isAdmin && (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div className="text-sm text-gray-500 mb-1">การจองทั้งหมด</div>
+                            <div className="text-3xl font-bold">{reservations.length} รายการ</div>
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div className="text-sm text-emerald-500 mb-1">อนุมัติแล้ว</div>
+                            <div className="text-3xl font-bold">{reservations.filter(r => r.status === 'APPROVED').length} รายการ</div>
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div className="text-sm text-amber-500 mb-1">รอการอนุมัติ</div>
+                            <div className="text-3xl font-bold">{reservations.filter(r => r.status === 'PENDING').length} รายการ</div>
+                        </div>
+                    </div>
+
+                    <div className="bg-indigo-600 dark:bg-indigo-700 p-8 rounded-3xl text-white shadow-lg overflow-hidden relative">
+                        <div className="relative z-10">
+                            <h3 className="text-xl font-bold mb-2">ออกรายงานสรุปผล</h3>
+                            <p className="text-indigo-100 text-sm mb-6 max-w-md">ดาวน์โหลดข้อมูลการจองห้องประชุมทั้งหมดในรูปแบบ PDF หรือ Excel เพื่อนำไปใช้งานด้านธุรการ</p>
+                            <div className="flex gap-4">
+                                <button
+                                    className="px-6 py-3 bg-white text-indigo-700 rounded-xl font-bold hover:bg-slate-50 transition-colors shadow-sm"
+                                    onClick={() => alert('ฟีเจอร์นี้ต้องใช้ไลบรารี jsPDF / ExcelJS')}
+                                >
+                                    ดาวน์โหลด PDF
+                                </button>
+                                <button
+                                    className="px-6 py-3 bg-indigo-500 text-white rounded-xl font-bold hover:bg-indigo-400 transition-colors border border-indigo-400"
+                                    onClick={() => alert('ฟีเจอร์นี้ต้องใช้ไลบรารี jsPDF / ExcelJS')}
+                                >
+                                    ดาวน์โหลด Excel
+                                </button>
+                            </div>
+                        </div>
+                        <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-indigo-500/30 rounded-full blur-3xl"></div>
+                    </div>
+                </div>
+            )}
+
 
             {/* History (เฉพาะ admin) */}
             {isAdmin && (
                 <section className="opacity-75">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">History</h2>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">ประวัติการจอง</h2>
+
 
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div className="divide-y divide-slate-100">
@@ -618,17 +851,19 @@ const AdminDashboard = () => {
                             <div className="flex justify-end gap-2">
                                 <button
                                     type="button"
+                                    disabled={processingIds.has(rejectTarget?.r?.id ?? "")}
                                     onClick={() => setRejectOpen(false)}
-                                    className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200"
+                                    className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-50"
                                 >
                                     ยกเลิก
                                 </button>
                                 <button
                                     type="button"
+                                    disabled={processingIds.has(rejectTarget?.r?.id ?? "")}
                                     onClick={confirmReject}
-                                    className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
+                                    className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:bg-slate-300"
                                 >
-                                    ยืนยัน Reject
+                                    {processingIds.has(rejectTarget?.r?.id ?? "") ? "กำลังบันทึก..." : "ยืนยัน Reject"}
                                 </button>
                             </div>
                         </div>

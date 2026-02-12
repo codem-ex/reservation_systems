@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* 
+  ✅ Force Tailwind v4 to use the ".dark" class strategy 
+  This ensures that when document.documentElement has the "dark" class, 
+  dark: variants are active. When it's removed, they are inactive.
+*/
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-primary-50: var(--color-indigo-50);
   --color-primary-100: var(--color-indigo-100);
@@ -15,7 +22,131 @@
 }
 
 @layer base {
+  :root {
+    --background: #f8fafc;
+    /* bg-slate-50 */
+    --foreground: #0f172a;
+    /* text-slate-900 */
+    --card: #ffffff;
+    --border: #e2e8f0;
+    /* slate-200 */
+  }
+
+  .dark {
+    --background: #020617;
+    /* bg-slate-950 */
+    --foreground: #f8fafc;
+    /* text-slate-100 */
+    --card: #0f172a;
+    /* bg-slate-900 */
+    --border: #1e293b;
+    /* slate-800 */
+  }
+
   body {
-    @apply bg-slate-50 text-slate-900;
+    background-color: var(--background);
+    color: var(--foreground);
+    @apply transition-colors duration-300;
+  }
+
+  /* 
+    Robust Global Overrides for Dark Mode 
+    This handles components that use hardcoded tailwind classes 
+    like text-gray-900 on dark backgrounds.
+  */
+
+  .dark .bg-white,
+  .dark .bg-slate-50,
+  .dark .bg-gray-50 {
+    background-color: #0f172a !important;
+    /* slate-900 */
+    color: #f8fafc !important;
+    /* slate-50 */
+  }
+
+  /* Fix Primary/Brand color visibility */
+  .dark .text-primary-600,
+  .dark .text-primary-700,
+  .dark .text-indigo-600,
+  .dark .text-indigo-700 {
+    color: #818cf8 !important;
+    /* indigo-400 */
+  }
+
+  .dark .text-primary-800,
+  .dark .text-primary-900,
+  .dark .text-indigo-800,
+  .dark .text-indigo-900 {
+    color: #a5b4fc !important;
+    /* indigo-300 */
+  }
+
+  /* Fix text visibility for common Tailwind colors */
+  .dark .text-gray-900,
+  .dark .text-slate-900,
+  .dark .text-black {
+    color: #f8fafc !important;
+    /* slate-50 */
+  }
+
+  .dark .text-gray-800,
+  .dark .text-slate-800,
+  .dark .text-gray-700,
+  .dark .text-slate-700 {
+    color: #e2e8f0 !important;
+    /* slate-200 */
+  }
+
+  .dark .text-gray-600,
+  .dark .text-slate-600,
+  .dark .text-gray-500,
+  .dark .text-slate-500 {
+    color: #cbd5e1 !important;
+    /* slate-300 - lighter for better contrast */
+  }
+
+  .dark .border-gray-100,
+  .dark .border-slate-100,
+  .dark .border-gray-200,
+  .dark .border-slate-200,
+  .dark .border-gray-300,
+  .dark .border-slate-300 {
+    border-color: #1e293b !important;
+    /* slate-800 */
+  }
+
+  .dark .divide-slate-100,
+  .dark .divide-gray-100,
+  .dark .divide-slate-200,
+  .dark .divide-gray-200 {
+    border-color: #334155 !important;
+    /* slate-700 */
+  }
+
+  /* Specific fix for inputs */
+  .dark input,
+  .dark textarea,
+  .dark select {
+    background-color: #1e293b !important;
+    /* slate-800 */
+    color: #ffffff !important;
+    border-color: #475569 !important;
+    /* slate-600 */
+  }
+
+  /* Specific fix for placeholders */
+  .dark ::placeholder {
+    color: #94a3b8 !important;
+    /* slate-400 */
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/70 backdrop-blur-md border border-white/20;
+  }
+
+  .dark .glass {
+    @apply bg-slate-900/70 border-slate-800/50;
   }
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../lib/auth";
@@ -336,7 +336,7 @@ export default function AdminAddRoom() {
         <div className="min-h-[70vh] flex items-start justify-center py-10 px-4">
             <div className="w-full max-w-5xl">
                 <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">Add Room</h1>
+                    <h1 className="text-3xl font-bold text-gray-900">เพิ่มห้องประชุม</h1>
                     <p className="text-gray-500 mt-2">เพิ่มข้อมูลห้องประชุม (เฉพาะแอดมิน)</p>
                 </div>
 

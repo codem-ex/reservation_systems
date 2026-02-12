@@ -7,8 +7,12 @@ import SearchRooms from "./pages/SearchRooms";
 import MyBookings from "./pages/MyBookings";
 import AdminDashboard from "./pages/AdminDashboard";
 import Login from "./pages/Login";
+import AuthCallback from "./pages/AuthCallback";
 import Profile from "./pages/Profile";
 import AdminAddRoom from "./pages/AdminAddRoom";
+import AdminEditRoom from "./pages/AdminEditRoom";
+import RoomSchedule from "./pages/RoomSchedule";
+import Notifications from "./pages/Notifications";
 
 import { getCurrentUser } from "./services/storage";
 import { useAuth } from "./lib/auth";
@@ -25,8 +29,8 @@ function isProfileComplete(p: ProfileLite | null): boolean {
   if (!p) return false;
   const deptOk = !!(p.department && p.department.trim().length > 0);
   const phoneOk = !!(p.mobile_phone && p.mobile_phone.trim().length > 0);
-  const avatarOk = !!(p.avatar_url && p.avatar_url.trim().length > 0);
-  return deptOk && phoneOk && avatarOk;
+  // avatar_url is optional — auto-filled from Google metadata by trigger
+  return deptOk && phoneOk;
 }
 
 /* ===================================
@@ -34,13 +38,16 @@ function isProfileComplete(p: ProfileLite | null): boolean {
    - If profile incomplete -> force /profile
    - If complete -> allow access
 =================================== */
+// Global cache to prevent flickering on remount
+let profileCompleteCache: boolean | null = null;
+
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { user: supabaseUser, loading: authLoading } = useAuth();
   const localUser = getCurrentUser();
   const location = useLocation();
 
   const [profileLoading, setProfileLoading] = useState(false);
-  const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
+  const [profileComplete, setProfileComplete] = useState<boolean | null>(profileCompleteCache);
 
   const isAuthed = useMemo(() => !!supabaseUser || !!localUser, [supabaseUser, localUser]);
 
@@ -52,7 +59,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      setProfileLoading(true);
+      setProfileLoading(profileCompleteCache === null);
       try {
         const { data, error } = await supabase
           .from("profiles")
@@ -66,14 +73,17 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
           return;
         }
 
-        setProfileComplete(isProfileComplete((data as ProfileLite) ?? null));
+        const isComplete = isProfileComplete((data as ProfileLite) ?? null);
+        setProfileComplete(isComplete);
+        profileCompleteCache = isComplete;
       } finally {
         setProfileLoading(false);
       }
     };
 
     if (!authLoading) run();
-  }, [authLoading, supabaseUser]);
+    // Use supabaseUser?.id (not supabaseUser) to avoid re-running on token refresh
+  }, [authLoading, supabaseUser?.id]);
 
   // Wait until auth state is resolved
   if (authLoading) {
@@ -116,6 +126,9 @@ function App() {
         {/* Public: Login */}
         <Route path="/login" element={<Login />} />
 
+        {/* Public: OAuth callback (no PrivateRoute!) */}
+        <Route path="/auth/callback" element={<AuthCallback />} />
+
         {/* Protected single page: Profile (force for first-time users) */}
         <Route
           path="/profile"
@@ -137,11 +150,16 @@ function App() {
         >
           <Route index element={<Home />} />
           <Route path="search" element={<SearchRooms />} />
+          <Route path="schedule" element={<RoomSchedule />} />
           <Route path="bookings" element={<MyBookings />} />
+          <Route path="notifications" element={<Notifications />} />
           <Route path="admin" element={<AdminDashboard />} />
 
           {/* ✅ New: Admin add room */}
           <Route path="admin/rooms/new" element={<AdminAddRoom />} />
+
+          {/* ✅ New: Admin edit room */}
+          <Route path="admin/rooms/edit/:id" element={<AdminEditRoom />} />
 
           {/* Redirect unknown routes to home */}
           <Route path="*" element={<Navigate to="/" replace />} />

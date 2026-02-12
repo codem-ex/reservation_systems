@@ -1,11 +1,11 @@
-import React, { useMemo, useState } from "react";
-import { X, User as UserIcon } from "lucide-react";
+import { useMemo, useState } from "react";
+import { X, User as UserIcon, Check, Maximize2, Layers } from "lucide-react";
 
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 
-import { DateRange, Range, RangeKeyDict } from "react-date-range";
+import { DateRange, type Range, type RangeKeyDict } from "react-date-range";
 import { th } from "date-fns/locale";
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
@@ -13,6 +13,7 @@ import "react-date-range/dist/theme/default.css";
 import type { Room, User } from "../types";
 import { supabase } from "../lib/supabaseClient";
 import { ensureProfileEmail } from "../lib/ensureProfile";
+import ImageLightbox from "./ImageLightbox";
 
 /* ===== timezone ===== */
 dayjs.extend(utc);
@@ -22,6 +23,9 @@ dayjs.tz.setDefault("Asia/Bangkok");
 interface BookingModalProps {
     room: Room;
     currentUser: User;
+    initialDate?: string;
+    initialStartTime?: string;
+    initialEndTime?: string;
     onClose: () => void;
     onSuccess: () => void;
 }
@@ -58,20 +62,23 @@ const timeToMinutes = (t: string) => {
 const BookingModal: React.FC<BookingModalProps> = ({
     room,
     currentUser,
+    initialDate,
+    initialStartTime,
+    initialEndTime,
     onClose,
     onSuccess,
 }) => {
     /* ===== ranges ===== */
     const [useRange, setUseRange] = useState<Range>({
         key: "use",
-        startDate: startOfDay(new Date()),
-        endDate: startOfDay(new Date()),
+        startDate: initialDate ? startOfDay(new Date(initialDate)) : startOfDay(new Date()),
+        endDate: initialDate ? startOfDay(new Date(initialDate)) : startOfDay(new Date()),
     });
 
     const [setupRange, setSetupRange] = useState<Range>({
         key: "setup",
-        startDate: startOfDay(new Date()),
-        endDate: startOfDay(new Date()),
+        startDate: initialDate ? startOfDay(new Date(initialDate)) : startOfDay(new Date()),
+        endDate: initialDate ? startOfDay(new Date(initialDate)) : startOfDay(new Date()),
     });
 
     const [active, setActive] = useState<"use" | "setup">("use");
@@ -79,14 +86,41 @@ const BookingModal: React.FC<BookingModalProps> = ({
     /* ===== form ===== */
     const [title, setTitle] = useState("");
     const [purpose, setPurpose] = useState("");
+    const [agenda, setAgenda] = useState("");
+    const [guestCount, setGuestCount] = useState(1);
+
+
 
     /* ===== time (24h) ===== */
     const [setupStart, setSetupStart] = useState("08:00");
-    const [setupEnd, setSetupEnd] = useState("09:00");
-    const [startTime, setStartTime] = useState("09:00");
-    const [endTime, setEndTime] = useState("10:00");
+    const [setupEnd, setSetupEnd] = useState(initialStartTime || "09:00");
+    const [startTime, setStartTime] = useState(initialStartTime || "09:00");
+    const [endTime, setEndTime] = useState(initialEndTime || "10:00");
 
     const [loading, setLoading] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
+
+    /* ===== Lightbox ===== */
+    const [lightboxOpen, setLightboxOpen] = useState(false);
+    const [currentImgIdx, setCurrentImgIdx] = useState(0);
+
+    // Extract all image URLs
+    const allImages = useMemo(() => {
+        const list: string[] = [];
+        // Legacy single URL
+        const single = (room as any).imageUrl;
+        if (single) list.push(single);
+
+        // Multiple images array
+        const multi = (room as any).images;
+        if (Array.isArray(multi)) {
+            multi.forEach(item => {
+                const url = typeof item === 'string' ? item : item?.url;
+                if (url && !list.includes(url)) list.push(url);
+            });
+        }
+        return list;
+    }, [room]);
 
     const useStart = useRange.startDate ?? new Date();
     const useEnd = useRange.endDate ?? useStart;
@@ -146,7 +180,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 room_id: room.id,
                 requester_id: currentUser.id,
                 title: title.trim(),
-                purpose: purpose.trim(),
+                purpose: [
+                    purpose.trim(),
+                    agenda.trim() ? `\n(วาระการประชุม: ${agenda.trim()})` : "",
+                    guestCount > 1 ? `\n(จำนวนผู้เข้าร่วม: ${guestCount} คน)` : "",
+                ].filter(Boolean).join("\n"),
 
                 start_at: buildISO(useStart, startTime),
                 end_at: buildISO(useEnd, endTime, true),
@@ -173,7 +211,32 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 alert("สร้างคำขอแล้ว แต่ไม่พบสายอนุมัติ (chain_id). กรุณาตั้ง approver_chains/steps ของห้องนี้ให้ active");
             }
 
-            onSuccess();
+            // ✅ 1. Add notification for the user who booked
+            await supabase.from("notifications").insert({
+                user_id: currentUser.id,
+                title: "ส่งคำขอจองห้องแล้ว",
+                message: `ส่งคำขอจองห้อง "${room.name}" สำหรับหัวข้อ "${title}" เรียบร้อยแล้ว ขณะนี้อยู่ระหว่างรอการอนุมัติ`,
+                type: 'new_reservation',
+                is_read: false
+            });
+
+            // ✅ 2. Notify all Admins that there is a new request
+            const { data: admins } = await supabase.from("profiles").select("id").eq("is_admin", true);
+            if (admins && admins.length > 0) {
+                const adminNotifs = admins.map(admin => ({
+                    user_id: admin.id,
+                    title: "มีคำขอจองห้องใหม่",
+                    message: `มีรายการขอใช้ห้อง "${room.name}" จากคุณ ${currentUser.name} (หัวข้อ: ${title})`,
+                    type: 'new_reservation',
+                    is_read: false
+                })).filter(n => n.user_id !== currentUser.id); // Don't notify self if admin is the one booking
+
+                if (adminNotifs.length > 0) {
+                    await supabase.from("notifications").insert(adminNotifs);
+                }
+            }
+
+            setShowSuccess(true);
         } catch (err: any) {
             alert(err?.message ?? "บันทึกไม่สำเร็จ");
         } finally {
@@ -183,16 +246,16 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6">
-            <div className="w-full max-w-6xl bg-white rounded-[32px] shadow-2xl overflow-hidden">
+            <div className="w-full max-w-6xl bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl overflow-hidden border dark:border-slate-800">
                 {/* header */}
-                <div className="flex justify-between items-center px-8 py-6 border-b">
+                <div className="flex justify-between items-center px-8 py-6 border-b dark:border-slate-800">
                     <div>
-                        <div className="text-sm text-gray-500">แบบคำขอใช้ห้องประชุม</div>
-                        <div className="text-xl font-semibold">{room.name}</div>
+                        <div className="text-sm text-gray-500 dark:text-slate-400">แบบคำขอใช้ห้องประชุม</div>
+                        <div className="text-xl font-semibold text-slate-900 dark:text-white">{room.name}</div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center"
+                        className="w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400"
                     >
                         <X />
                     </button>
@@ -205,10 +268,39 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 >
                     {/* LEFT */}
                     <div className="space-y-6">
-                        <div className="bg-indigo-50 rounded-2xl p-4 flex items-center gap-3">
-                            <UserIcon className="text-indigo-600" />
-                            <div className="text-sm">
-                                ผู้จอง : <b>{currentUser.name}</b>
+                        {/* Room Preview Image */}
+                        {allImages.length > 0 && (
+                            <div
+                                className="w-full h-48 rounded-[24px] overflow-hidden border dark:border-slate-800 shadow-sm relative group cursor-pointer"
+                                onClick={() => {
+                                    setCurrentImgIdx(0);
+                                    setLightboxOpen(true);
+                                }}
+                            >
+                                <img
+                                    src={allImages[0]}
+                                    alt={room.name}
+                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                    <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 duration-300">
+                                        <Maximize2 className="text-white w-6 h-6" />
+                                    </div>
+                                </div>
+
+                                {allImages.length > 1 && (
+                                    <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-2 py-1 rounded-lg border border-white/20 flex items-center gap-1.5 shadow-lg">
+                                        <Layers className="w-3.5 h-3.5 text-white" />
+                                        <span className="text-[10px] font-bold text-white">+{allImages.length - 1} รูป</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-4 flex items-center gap-3 border dark:border-indigo-800/30">
+                            <UserIcon className="text-indigo-600 dark:text-indigo-400" />
+                            <div className="text-sm text-slate-700 dark:text-slate-300">
+                                ผู้จอง : <b className="text-slate-900 dark:text-white">{currentUser.name}</b>
                             </div>
                         </div>
 
@@ -216,21 +308,21 @@ const BookingModal: React.FC<BookingModalProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setActive("use")}
-                                className={`p-4 rounded-2xl border text-left ${active === "use" ? "bg-indigo-50 border-indigo-300" : "border-gray-200"
+                                className={`p-4 rounded-2xl border text-left transition-colors ${active === "use" ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700" : "bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700"
                                     }`}
                             >
-                                <div className="text-xs text-gray-500">ช่วงวันใช้งาน</div>
-                                <div className="font-semibold text-indigo-700">{labelUse}</div>
+                                <div className="text-xs text-gray-500 dark:text-slate-400">ช่วงวันใช้งาน</div>
+                                <div className={`font-semibold ${active === "use" ? "text-indigo-700 dark:text-indigo-400" : "text-slate-600 dark:text-slate-400"}`}>{labelUse}</div>
                             </button>
 
                             <button
                                 type="button"
                                 onClick={() => setActive("setup")}
-                                className={`p-4 rounded-2xl border text-left ${active === "setup" ? "bg-yellow-50 border-yellow-300" : "border-gray-200"
+                                className={`p-4 rounded-2xl border text-left transition-colors ${active === "setup" ? "bg-yellow-50 dark:bg-yellow-900/30 border-yellow-300 dark:border-yellow-700" : "bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700"
                                     }`}
                             >
-                                <div className="text-xs text-gray-500">ช่วงวันจัดเตรียม</div>
-                                <div className="font-semibold text-yellow-700">{labelSetup}</div>
+                                <div className="text-xs text-gray-500 dark:text-slate-400">ช่วงวันจัดเตรียม</div>
+                                <div className={`font-semibold ${active === "setup" ? "text-yellow-700 dark:text-yellow-400" : "text-slate-600 dark:text-slate-400"}`}>{labelSetup}</div>
                             </button>
                         </div>
 
@@ -248,20 +340,20 @@ const BookingModal: React.FC<BookingModalProps> = ({
                             />
                         </div>
 
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
-                            <div className="font-semibold mb-3">เวลาจัดเตรียมสถานที่</div>
+                        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-2xl p-4">
+                            <div className="font-semibold mb-3 text-yellow-800 dark:text-yellow-400 text-sm">เวลาจัดเตรียมสถานที่</div>
                             <div className="grid grid-cols-2 gap-4">
                                 <input
                                     type="time"
                                     value={setupStart}
                                     onChange={(e) => setSetupStart(e.target.value)}
-                                    className="border rounded-xl p-3"
+                                    className="border dark:border-slate-700 rounded-xl p-3 dark:bg-slate-800 dark:text-white"
                                 />
                                 <input
                                     type="time"
                                     value={setupEnd}
                                     onChange={(e) => setSetupEnd(e.target.value)}
-                                    className="border rounded-xl p-3"
+                                    className="border dark:border-slate-700 rounded-xl p-3 dark:bg-slate-800 dark:text-white"
                                 />
                             </div>
                         </div>
@@ -269,41 +361,67 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
                     {/* RIGHT */}
                     <div className="space-y-6">
-                        <div className="border rounded-2xl p-6 space-y-4">
+                        <div className="border dark:border-slate-800 rounded-2xl p-6 space-y-4 bg-slate-50/50 dark:bg-slate-800/30">
                             <div>
-                                <label className="text-sm font-medium">หัวข้อการขอใช้ห้องประชุม</label>
+                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">หัวข้อการขอใช้ห้องประชุม</label>
                                 <input
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
-                                    className="mt-2 w-full border rounded-xl p-3"
+                                    className="mt-2 w-full border dark:border-slate-700 rounded-xl p-3 dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
                                 />
                             </div>
 
                             <div>
-                                <label className="text-sm font-medium">วัตถุประสงค์การใช้งาน</label>
+                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">วัตถุประสงค์การใช้งาน</label>
                                 <textarea
                                     rows={4}
                                     value={purpose}
                                     onChange={(e) => setPurpose(e.target.value)}
-                                    className="mt-2 w-full border rounded-xl p-3"
+                                    className="mt-2 w-full border rounded-xl p-3 dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    placeholder="เช่น เพื่อประชุมวางแผนงบประมาณ..."
                                 />
+                            </div>
+
+                            <div>
+                                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">วาระการประชุม / รายละเอียดเพิ่มเติม</label>
+                                <textarea
+                                    rows={3}
+                                    value={agenda}
+                                    onChange={(e) => setAgenda(e.target.value)}
+                                    className="mt-2 w-full border rounded-xl p-3 dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    placeholder="เช่น 1. สรุปรายรับรายจ่าย 2. พิจารณาโครงการใหม่..."
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">จำนวนผู้เข้าร่วม (คน)</label>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        value={guestCount}
+                                        onChange={(e) => setGuestCount(Number(e.target.value))}
+                                        className="mt-2 w-full border rounded-xl p-3 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                                    />
+                                </div>
                             </div>
                         </div>
 
-                        <div className="border rounded-2xl p-6">
-                            <div className="font-semibold mb-3">เวลาใช้งานห้องประชุม</div>
+
+                        <div className="border dark:border-slate-800 rounded-2xl p-6 bg-indigo-50/30 dark:bg-indigo-900/10">
+                            <div className="font-semibold mb-3 text-indigo-800 dark:text-indigo-400 text-sm">เวลาใช้งานห้องประชุม</div>
                             <div className="grid grid-cols-2 gap-4">
                                 <input
                                     type="time"
                                     value={startTime}
                                     onChange={(e) => setStartTime(e.target.value)}
-                                    className="border rounded-xl p-3"
+                                    className="border dark:border-slate-700 rounded-xl p-3 dark:bg-slate-800 dark:text-white"
                                 />
                                 <input
                                     type="time"
                                     value={endTime}
                                     onChange={(e) => setEndTime(e.target.value)}
-                                    className="border rounded-xl p-3"
+                                    className="border dark:border-slate-700 rounded-xl p-3 dark:bg-slate-800 dark:text-white"
                                 />
                             </div>
                         </div>
@@ -317,6 +435,37 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     </div>
                 </form>
             </div>
+            {/* Success Modal Overlay */}
+            {showSuccess && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center transform animate-in zoom-in-95 duration-200">
+                        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <Check className="w-10 h-10 text-green-600" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">ส่งคำขอจองแล้ว!</h3>
+                        <p className="text-gray-500 mb-8 leading-relaxed">
+                            ระบบได้รับคำขอจองห้องของคุณเรียบร้อยแล้ว<br />
+                            ขณะนี้อยู่ระหว่างรอการพิจารณาอนุมัติ
+                        </p>
+                        <button
+                            onClick={() => {
+                                setShowSuccess(false);
+                                onSuccess();
+                            }}
+                            className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-green-200"
+                        >
+                            ตกลง
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <ImageLightbox
+                images={allImages}
+                isOpen={lightboxOpen}
+                initialIndex={currentImgIdx}
+                onClose={() => setLightboxOpen(false)}
+            />
         </div>
     );
 };
