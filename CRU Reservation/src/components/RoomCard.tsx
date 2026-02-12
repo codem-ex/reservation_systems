@@ -198,7 +198,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onBook }) => {
 
     return (
         <>
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col h-full">
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col group/card">
                 {/* Image / Placeholder */}
                 <div
                     className={[
@@ -265,23 +265,22 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onBook }) => {
                             )}
                         </>
                     ) : (
-                        <div className="w-full h-full bg-slate-100 flex flex-col items-center justify-center text-slate-500 gap-2">
+                        <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 gap-2">
                             <ImageOff className="w-8 h-8" />
-                            <div className="text-sm font-medium">No image</div>
-                            <div className="text-xs">room-images / rooms / ...</div>
+                            <div className="text-sm font-medium text-slate-500 dark:text-slate-400">ไม่มีรูปภาพ</div>
                         </div>
                     )}
 
                     <div className="absolute top-3 right-3">
                         <span
                             className={[
-                                "px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide",
+                                "px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide shadow-sm",
                                 isAvailable
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-red-100 text-red-700",
+                                    ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50"
+                                    : "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800/50",
                             ].join(" ")}
                         >
-                            {status || "unknown"}
+                            {isAvailable ? "ว่าง" : status === "maintenance" ? "ซ่อมบำรุง" : status === "occupied" ? "ไม่ว่าง" : status}
                         </span>
                     </div>
                 </div>
@@ -291,26 +290,26 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onBook }) => {
                     <div className="flex justify-between items-start mb-2">
                         <div>
                             <h3
-                                className="text-lg font-bold text-gray-900 line-clamp-1"
+                                className="text-lg font-bold text-gray-900 dark:text-white line-clamp-1"
                                 title={roomName}
                             >
                                 {roomName}
                             </h3>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-gray-500 dark:text-slate-400">
                                 {(room as any).type ?? ""}
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex items-center space-x-4 my-3 text-sm text-gray-600">
+                    <div className="flex items-center space-x-4 my-3 text-sm text-gray-600 dark:text-slate-400">
                         <div className="flex items-center" title="Capacity">
-                            <Users className="w-4 h-4 mr-1.5" />
-                            {room.capacity}
+                            <Users className="w-4 h-4 mr-1.5 text-slate-400 dark:text-slate-500" />
+                            {room.capacity} คน
                         </div>
 
                         {(room as any).location && (
                             <div className="flex items-center" title="Location">
-                                <MapPin className="w-4 h-4 mr-1.5" />
+                                <MapPin className="w-4 h-4 mr-1.5 text-slate-400 dark:text-slate-500" />
                                 <span className="truncate max-w-[140px]">
                                     {String((room as any).location).split(",")[0]}
                                 </span>
@@ -318,23 +317,23 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onBook }) => {
                         )}
 
                         {equipment.length > 0 && (
-                            <div className="flex items-center" title="Equipment">
-                                <Monitor className="w-4 h-4 mr-1.5" />
-                                {equipment.length} items
+                            <div className="flex items-center" title="อุปกรณ์">
+                                <Monitor className="w-4 h-4 mr-1.5 text-slate-400 dark:text-slate-500" />
+                                {equipment.length} รายการ
                             </div>
                         )}
                     </div>
 
                     {/* Expandable Details */}
                     {isExpanded && (
-                        <div className="mb-4 pt-3 border-t border-gray-100 text-sm animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="mb-4 pt-3 border-t border-gray-100 dark:border-slate-800 text-sm animate-in fade-in slide-in-from-top-2 duration-200">
                             {(room as any).description && (
                                 <div className="mb-3">
-                                    <div className="flex items-center text-gray-700 font-medium mb-1">
+                                    <div className="flex items-center text-gray-700 dark:text-slate-300 font-medium mb-1">
                                         <Info className="w-3.5 h-3.5 mr-1.5" />
-                                        Description
+                                        รายละเอียด
                                     </div>
-                                    <p className="text-gray-600 leading-relaxed">
+                                    <p className="text-gray-600 dark:text-slate-400 leading-relaxed">
                                         {String((room as any).description)}
                                     </p>
                                 </div>
@@ -342,23 +341,23 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onBook }) => {
 
                             {(room as any).location && (
                                 <div className="mb-3">
-                                    <span className="text-gray-700 font-medium block mb-1">
-                                        Full Location:
+                                    <span className="text-gray-700 dark:text-slate-300 font-medium block mb-1">
+                                        สถานที่ตั้ง:
                                     </span>
-                                    <p className="text-gray-600">
+                                    <p className="text-gray-600 dark:text-slate-400">
                                         {String((room as any).location)}
                                     </p>
                                 </div>
                             )}
 
                             <div>
-                                <span className="text-gray-700 font-medium block mb-1">
-                                    Equipment:
+                                <span className="text-gray-700 dark:text-slate-300 font-medium block mb-1">
+                                    อุปกรณ์ที่มีให้:
                                 </span>
                                 {equipment.length === 0 ? (
-                                    <p className="text-gray-500">-</p>
+                                    <p className="text-gray-500 dark:text-slate-500">-</p>
                                 ) : (
-                                    <ul className="list-disc list-inside text-gray-600 grid grid-cols-2 gap-1">
+                                    <ul className="list-disc list-inside text-gray-600 dark:text-slate-400 grid grid-cols-2 gap-1 text-xs">
                                         {equipment.map((item, i) => (
                                             <li key={i}>{item}</li>
                                         ))}
@@ -390,7 +389,7 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onBook }) => {
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setIsExpanded(!isExpanded)}
-                                className="px-3 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-slate-50 flex items-center justify-center transition-colors"
+                                className="px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center transition-colors shadow-sm"
                                 title={isExpanded ? "Show Less" : "Show Details"}
                                 type="button"
                             >
@@ -407,17 +406,10 @@ const RoomCard: React.FC<RoomCardProps> = ({ room, onBook }) => {
                                 className="flex-1 bg-primary-600 text-white py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                                 type="button"
                             >
-                                {isAvailable ? "Book Room" : "Unavailable"}
+                                {isAvailable ? "จองห้องนี้" : "ไม่ว่าง"}
                             </button>
                         </div>
 
-                        {/* ✅ Debug line */}
-                        <div className="text-[11px] text-gray-400 break-all">
-                            <div>room.id: {String(roomId)}</div>
-                            <div>img.count: {images.length}</div>
-                            {images[0]?.raw ? <div>img.raw[0]: {images[0].raw}</div> : null}
-                            {images[0]?.url ? <div>img.url[0]: {images[0].url}</div> : null}
-                        </div>
                     </div>
                 </div>
             </div>

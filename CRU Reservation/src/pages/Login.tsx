@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { User as UserIcon, Lock } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 
@@ -11,23 +11,29 @@ import { supabase } from "../lib/supabaseClient";
   - Redirect on success
 */
 
+import { useNavigate } from "react-router-dom";
+
 const ALLOWED_DOMAIN = "chandra.ac.th";
 
 function isAllowedEmail(email?: string | null): boolean {
     if (!email) return false;
-    return email.toLowerCase().endsWith(`@${ALLOWED_DOMAIN}`);
+    const lower = email.toLowerCase();
+    // อนุญาตทั้ง @chandra.ac.th และ @*.chandra.ac.th
+    return lower.endsWith(`@${ALLOWED_DOMAIN}`) || lower.endsWith(`.${ALLOWED_DOMAIN}`);
 }
 
 const Login: React.FC = () => {
+    const navigate = useNavigate();
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
-    // Redirect URL (from env or current origin)
+    // Redirect URL — lands on the public /auth/callback page
+    // so the hash fragment (#access_token=…) is parsed there,
+    // safely outside of PrivateRoute.
     const redirectTo = useMemo(() => {
         const envUrl = import.meta.env.VITE_AUTH_REDIRECT_URL as string | undefined;
-        return envUrl && envUrl.trim() !== ""
-            ? envUrl
-            : window.location.origin;
+        if (envUrl && envUrl.trim() !== "") return envUrl;
+        return `${window.location.origin}/auth/callback`;
     }, []);
 
     // Force logout with message
@@ -45,18 +51,30 @@ const Login: React.FC = () => {
         const { data } = await supabase.auth.getUser();
         const email = data.user?.email;
 
-        if (email && !isAllowedEmail(email)) {
-            await forceLogout(`อนุญาตเฉพาะบัญชี @${ALLOWED_DOMAIN} เท่านั้น`);
+        if (email) {
+            console.log("Login: Checking existing session for", email);
+            if (!isAllowedEmail(email)) {
+                await forceLogout(`อนุญาตเฉพาะบัญชี @${ALLOWED_DOMAIN} เท่านั้น (พบ: ${email})`);
+                return;
+            }
+
+            // Valid user already exists -> redirect to home (Internal only)
+            if (window.location.pathname === "/login") {
+                navigate("/", { replace: true });
+            }
         }
     };
 
     // Listen auth state
     useEffect(() => {
+        // Run once on mount
         enforceDomain();
 
         const { data: listener } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-                if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+                console.log("Login: Global Auth Event ->", event);
+
+                if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
                     const email = session?.user?.email;
 
                     if (email && !isAllowedEmail(email)) {
@@ -64,9 +82,8 @@ const Login: React.FC = () => {
                         return;
                     }
 
-                    // Valid user → go home
-                    if (email && isAllowedEmail(email)) {
-                        window.location.href = "/";
+                    if (email && isAllowedEmail(email) && window.location.pathname === "/login") {
+                        navigate("/", { replace: true });
                     }
                 }
             }
@@ -75,13 +92,15 @@ const Login: React.FC = () => {
         return () => {
             listener.subscription.unsubscribe();
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [navigate]);
 
     // Google OAuth
     const handleGoogleLogin = async () => {
         setError("");
         setLoading(true);
+
+        // ✅ Clear old session before starting new login
+        await supabase.auth.signOut();
 
         const { error } = await supabase.auth.signInWithOAuth({
             provider: "google",
@@ -91,7 +110,7 @@ const Login: React.FC = () => {
                 // UX hint for Google account chooser
                 queryParams: {
                     hd: ALLOWED_DOMAIN,
-                    // prompt: "select_account",
+                    prompt: "select_account",
                 },
             },
         });
@@ -103,20 +122,20 @@ const Login: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-200 to-slate-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 transition-colors">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl dark:shadow-none p-8 w-full max-w-md border border-transparent dark:border-slate-800">
 
                 {/* Header */}
                 <div className="text-center mb-8">
-                    <div className="bg-primary-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <UserIcon className="w-8 h-8 text-primary-600" />
+                    <div className="bg-primary-100 dark:bg-primary-900/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <UserIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
                     </div>
 
-                    <h1 className="text-2xl font-bold text-gray-900">
-                        Sign In
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                        เข้าสู่ระบบ
                     </h1>
 
-                    <p className="text-gray-500 mt-2">
+                    <p className="text-gray-500 dark:text-slate-400 mt-2">
                         ระบบจองห้องประชุม มหาวิทยาลัยราชภัฏจันทรเกษม
                     </p>
                 </div>
@@ -136,8 +155,8 @@ const Login: React.FC = () => {
                     disabled={loading}
                     className="
             w-full py-3 rounded-lg font-semibold border
-            bg-white text-gray-800 border-gray-200
-            hover:bg-gray-50
+            bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 border-gray-200 dark:border-slate-700
+            hover:bg-gray-50 dark:hover:bg-slate-700
             transition-colors
             flex items-center justify-center
             shadow-sm
@@ -169,12 +188,12 @@ const Login: React.FC = () => {
                         />
                     </svg>
 
-                    {loading ? "Redirecting…" : "Login with Google"}
+                    {loading ? "กำลังเปลี่ยนเส้นทาง…" : "เข้าสู่ระบบด้วย Google"}
                 </button>
 
                 {/* Footer */}
-                <div className="mt-6 pt-6 border-t border-gray-100">
-                    <p className="text-xs text-center text-gray-500">
+                <div className="mt-6 pt-6 border-t border-gray-100 dark:border-slate-800">
+                    <p className="text-xs text-center text-gray-500 dark:text-slate-400">
                         กรุณาเข้าสู่ระบบด้วยบัญชี Google <br />
                         <b>@{ALLOWED_DOMAIN}</b> เท่านั้น
                     </p>

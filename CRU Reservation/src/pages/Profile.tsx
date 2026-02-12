@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../lib/auth";
 import { User as UserIcon, Save, Loader2 } from "lucide-react";
@@ -133,16 +133,16 @@ export default function Profile() {
         <div className="min-h-[70vh] flex items-start justify-center py-10 px-4">
             <div className="w-full max-w-4xl">
                 <div className="mb-6 text-center">
-                    <h1 className="text-3xl font-bold text-gray-900">Profile</h1>
-                    <p className="text-gray-500 mt-2">แก้ไขข้อมูลผู้ใช้งาน</p>
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">โปรไฟล์</h1>
+                    <p className="text-gray-500 dark:text-slate-400 mt-2">แก้ไขข้อมูลผู้ใช้งาน</p>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6">
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 transition-colors">
                     <div className="flex flex-col md:flex-row gap-8">
                         {/* Left profile summary (centered) */}
                         <div className="w-full md:w-80 md:self-center">
                             <div className="flex flex-col items-center text-center gap-3">
-                                <div className="w-20 h-20 rounded-full bg-primary-100 overflow-hidden flex items-center justify-center">
+                                <div className="w-20 h-20 rounded-full bg-primary-100 dark:bg-primary-900/40 overflow-hidden flex items-center justify-center border border-primary-200 dark:border-primary-800/50">
                                     {avatarUrl ? (
                                         <img
                                             src={avatarUrl}
@@ -151,13 +151,13 @@ export default function Profile() {
                                             referrerPolicy="no-referrer"
                                         />
                                     ) : (
-                                        <UserIcon className="w-10 h-10 text-primary-600" />
+                                        <UserIcon className="w-10 h-10 text-primary-600 dark:text-primary-400" />
                                     )}
                                 </div>
 
                                 <div>
-                                    <div className="font-semibold text-gray-900 text-lg">{name}</div>
-                                    <div className="text-sm text-gray-500 break-all">{email}</div>
+                                    <div className="font-semibold text-gray-900 dark:text-white text-lg">{name}</div>
+                                    <div className="text-sm text-gray-500 dark:text-slate-400 break-all">{email}</div>
                                 </div>
                             </div>
                         </div>
@@ -179,48 +179,48 @@ export default function Profile() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Email (Read-only)
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                                        อีเมล (อ่านอย่างเดียว)
                                     </label>
                                     <input
                                         value={email}
                                         readOnly
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700"
+                                        className="w-full px-4 py-3 border border-gray-200 dark:border-slate-800 rounded-lg bg-gray-50 dark:bg-slate-800/50 text-gray-700 dark:text-slate-400"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        ชื่อ (Read-only)
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                                        ชื่อ (อ่านอย่างเดียว)
                                     </label>
                                     <input
                                         value={name}
                                         readOnly
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700"
+                                        className="w-full px-4 py-3 border border-gray-200 dark:border-slate-800 rounded-lg bg-gray-50 dark:bg-slate-800/50 text-gray-700 dark:text-slate-400"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                         เบอร์มือถือ
                                     </label>
                                     <input
                                         value={mobile}
                                         onChange={(e) => setMobile(e.target.value)}
                                         placeholder="เช่น 08x-xxx-xxxx"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 rounded-lg dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                         หน่วยงาน
                                     </label>
                                     <input
                                         value={department}
                                         onChange={(e) => setDepartment(e.target.value)}
                                         placeholder="เช่น คณะ/สำนัก/ภาควิชา"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 rounded-lg dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                                     />
                                 </div>
                             </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search, CalendarDays, Clock } from "lucide-react";
 
@@ -96,22 +96,22 @@ const Home = () => {
        Loading State (Auth)
     =============================== */
     if (loading) {
-        return <div className="p-6 text-gray-500">Loading user session...</div>;
+        return <div className="p-6 text-gray-500">กำลังโหลดข้อมูลผู้ใช้งาน...</div>;
     }
 
     return (
         <div className="space-y-8">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                    Welcome back, {displayName.split(" ")[0]}!
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                    ยินดีต้อนรับกลับมา, {displayName.split(" ")[0]}!
                 </h1>
 
-                <p className="text-gray-500 mt-2">
-                    Here's what's happening with your room bookings.
+                <p className="text-gray-500 dark:text-slate-400 mt-2">
+                    นี่คือข้อมูลการจองห้องประชุมของคุณ
                 </p>
 
-                {displayEmail && <p className="mt-1 text-sm text-gray-400">{displayEmail}</p>}
+                {displayEmail && <p className="mt-1 text-sm text-gray-400 dark:text-slate-500">{displayEmail}</p>}
             </div>
 
             {/* Quick Actions */}
@@ -121,78 +121,82 @@ const Home = () => {
                         <div className="flex items-center justify-between mb-4">
                             <Search className="w-8 h-8 opacity-80" />
                             <span className="bg-primary-500 px-3 py-1 rounded-full text-xs font-semibold">
-                                New
+                                ใหม่
                             </span>
                         </div>
-                        <h3 className="text-xl font-bold mb-1">Find a Room</h3>
+                        <h3 className="text-xl font-bold mb-1">ค้นหาห้อง</h3>
                         <p className="text-primary-100 text-sm">
-                            Search available rooms by time and capacity.
+                            ค้นหาห้องว่างตามเวลาและความจุที่ต้องการ
                         </p>
                     </Link>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors">
                     <div className="flex items-center justify-between mb-4">
-                        <CalendarDays className="w-8 h-8 text-blue-500" />
-                        <span className="text-2xl font-bold text-gray-900">{activeBookings}</span>
+                        <CalendarDays className="w-8 h-8 text-blue-500 dark:text-blue-400" />
+                        <span className="text-2xl font-bold text-gray-900 dark:text-white">{activeBookings}</span>
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900">Your Bookings</h3>
-                    <p className="text-gray-500 text-sm">Active reservations</p>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">การจองของคุณ</h3>
+                    <p className="text-gray-500 dark:text-slate-400 text-sm">รายการที่กำลังดำเนินการ</p>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors">
                     <div className="flex items-center justify-between mb-4">
-                        <Clock className="w-8 h-8 text-emerald-500" />
-                        <span className="text-2xl font-bold text-gray-900">
+                        <Clock className="w-8 h-8 text-emerald-500 dark:text-emerald-400" />
+                        <span className="text-2xl font-bold text-gray-900 dark:text-white">
                             {rooms.filter((r) => r.status === "available").length}
                         </span>
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900">Available Rooms</h3>
-                    <p className="text-gray-500 text-sm">Ready for booking now</p>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">ห้องว่าง</h3>
+                    <p className="text-gray-500 dark:text-slate-400 text-sm">พร้อมสำหรับการจองทันที</p>
                 </div>
             </div>
 
             {/* Recent Activity */}
             <section>
-                <h2 className="text-xl font-bold text-gray-900 mb-4">
-                    Recent Activity (All Rooms)
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                    กิจกรรมล่าสุด (ห้องทั้งหมด)
                 </h2>
 
-                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors shadow-sm">
                     {allBookings.length === 0 ? (
-                        <div className="p-8 text-center text-gray-500">
-                            No bookings yet. Start by finding a room!
+                        <div className="p-8 text-center text-gray-500 dark:text-slate-400">
+                            ยังไม่มีข้อมูลการจอง เริ่มต้นโดยการค้นหาห้องได้เลย!
                         </div>
                     ) : (
-                        <div className="divide-y divide-slate-100">
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
                             {allBookings.slice(0, 10).map((booking) => {
                                 const room = rooms.find((r) => r.id === booking.roomId);
 
                                 return (
                                     <div
                                         key={booking.id}
-                                        className="p-4 hover:bg-slate-50 flex items-center justify-between"
+                                        className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-between transition-colors"
                                     >
                                         <div>
-                                            <h4 className="font-medium text-gray-900">
-                                                {room?.name || "Unknown Room"}
+                                            <h4 className="font-medium text-gray-900 dark:text-white">
+                                                {room?.name || "ไม่ทราบชื่อห้อง"}
                                             </h4>
-                                            <p className="text-sm text-gray-500">
-                                                {new Date(booking.startTime).toLocaleDateString()} •{" "}
-                                                {new Date(booking.startTime).toLocaleTimeString()}
+                                            <p className="text-sm text-gray-500 dark:text-slate-400">
+                                                {new Date(booking.start_at).toLocaleDateString()} •{" "}
+                                                {new Date(booking.start_at).toLocaleTimeString()}
                                             </p>
                                         </div>
 
                                         <span
-                                            className={`px-3 py-1 rounded-full text-xs font-medium capitalize 
+                                            className={`px-3 py-1 rounded-full text-xs font-medium capitalize border
                       ${booking.status === "approved"
-                                                    ? "bg-green-100 text-green-700"
+                                                    ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800/50"
                                                     : booking.status === "pending"
-                                                        ? "bg-yellow-100 text-yellow-700"
-                                                        : "bg-red-100 text-red-700"
+                                                        ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800/50"
+                                                        : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800/50"
                                                 }`}
                                         >
-                                            {booking.status}
+                                            {booking.status === "approved"
+                                                ? "อนุมัติแล้ว"
+                                                : booking.status === "pending"
+                                                    ? "รออนุมัติ"
+                                                    : "ปฏิเสธ/ยกเลิก"}
                                         </span>
                                     </div>
                                 );

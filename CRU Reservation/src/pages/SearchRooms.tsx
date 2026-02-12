@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, Calendar as CalendarIcon, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -84,6 +84,7 @@ const SearchRooms = () => {
     const [startTime, setStartTime] = useState("09:00");
     const [endTime, setEndTime] = useState("10:00");
     const [minCapacity, setMinCapacity] = useState(0);
+    const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
 
     const [selectedRoom, setSelectedRoom] = useState<any | null>(null);
 
@@ -150,15 +151,19 @@ const SearchRooms = () => {
                 // 2) capacity
                 const matchesCapacity = Number(room.capacity) >= Number(minCapacity);
 
-                // 3) status availability (rooms.status)
-                const st = normalizeRoomStatus(room.status);
-                const isAvailableByStatus = st === "available";
-                // ถ้าคุณใช้ค่าอื่นเช่น "unavailable"/"maintenance" ก็จะไม่ผ่าน
-
-                // 4) is_active
+                // 3) is_active
                 const isActive = room.is_active === true;
 
-                // 5) overlap by reservations
+                // 4) amenities filter
+                const matchesAmenities = selectedAmenities.length === 0 ||
+                    selectedAmenities.every(a => Array.isArray(room.amenities) && room.amenities.includes(a));
+
+                return matchesSearch && matchesCapacity && isActive && matchesAmenities;
+            })
+            .map((room) => {
+                const legacy = toLegacyRoom(room);
+
+                // Check overlap by reservations
                 const isOccupied = reservations.some((r) => {
                     if (r.room_id !== room.id) return false;
                     if (!isReservationBlocking(r.status)) return false;
@@ -170,10 +175,13 @@ const SearchRooms = () => {
                     return searchStart < bEnd && searchEnd > bStart;
                 });
 
-                return matchesSearch && matchesCapacity && isActive && isAvailableByStatus && !isOccupied;
-            })
-            .map(toLegacyRoom);
-    }, [rooms, reservations, searchTerm, minCapacity, selectedDate, startTime, endTime]);
+                if (isOccupied) {
+                    legacy.status = "occupied";
+                }
+
+                return legacy;
+            });
+    }, [rooms, reservations, searchTerm, minCapacity, selectedDate, startTime, endTime, selectedAmenities]);
 
     const handleBook = (room: any) => setSelectedRoom(room);
     const handleCloseModal = () => setSelectedRoom(null);
@@ -205,15 +213,15 @@ const SearchRooms = () => {
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <h1 className="text-2xl font-bold text-gray-900">Find a Meeting Room</h1>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">ค้นหาห้องประชุม</h1>
 
                 {/* Search Bar */}
                 <div className="relative w-full md:w-96">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
                         type="text"
-                        placeholder="Search by name / location / description..."
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="ค้นหาตามชื่อ / สถานที่ / รายละเอียด..."
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -221,12 +229,12 @@ const SearchRooms = () => {
             </div>
 
             {/* Filters */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 transition-colors">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">วันที่</label>
                     <input
                         type="date"
-                        className="w-full border border-gray-300 rounded-lg p-2"
+                        className="w-full border border-gray-300 dark:border-slate-700 rounded-lg p-2 dark:bg-slate-800 dark:text-white"
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
                         min={format(new Date(), "yyyy-MM-dd")}
@@ -234,33 +242,33 @@ const SearchRooms = () => {
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">เวลาเริ่ม</label>
                     <input
                         type="time"
-                        className="w-full border border-gray-300 rounded-lg p-2"
+                        className="w-full border border-gray-300 dark:border-slate-700 rounded-lg p-2 dark:bg-slate-800 dark:text-white"
                         value={startTime}
                         onChange={(e) => setStartTime(e.target.value)}
                     />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">เวลาสิ้นสุด</label>
                     <input
                         type="time"
-                        className="w-full border border-gray-300 rounded-lg p-2"
+                        className="w-full border border-gray-300 dark:border-slate-700 rounded-lg p-2 dark:bg-slate-800 dark:text-white"
                         value={endTime}
                         onChange={(e) => setEndTime(e.target.value)}
                     />
                     {new Date(`${selectedDate}T${endTime}`) <= new Date(`${selectedDate}T${startTime}`) && (
-                        <div className="text-xs text-red-600 mt-1">End time must be after start time</div>
+                        <div className="text-xs text-red-600 dark:text-red-400 mt-1">เวลาสิ้นสุดต้องอยู่หลังเวลาเริ่ม</div>
                     )}
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Min Capacity</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">ความจุขั้นต่ำ (คน)</label>
                     <input
                         type="number"
-                        className="w-full border border-gray-300 rounded-lg p-2"
+                        className="w-full border border-gray-300 dark:border-slate-700 rounded-lg p-2 dark:bg-slate-800 dark:text-white"
                         value={minCapacity}
                         onChange={(e) => setMinCapacity(Number(e.target.value))}
                         min={0}
@@ -268,15 +276,34 @@ const SearchRooms = () => {
                 </div>
             </div>
 
+            {/* Amenities Filter */}
+            <div className="flex flex-wrap gap-2">
+                {Array.from(new Set(rooms.flatMap(r => Array.isArray(r.amenities) ? r.amenities : []))).map(a => (
+                    <button
+                        key={a}
+                        onClick={() => setSelectedAmenities(prev =>
+                            prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a]
+                        )}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors
+                            ${selectedAmenities.includes(a)
+                                ? 'bg-primary-600 border-primary-600 text-white'
+                                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                            }`}
+                    >
+                        {a}
+                    </button>
+                ))}
+            </div>
+
             {/* Results */}
             {filteredRooms.length === 0 ? (
-                <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-gray-300">
-                    <CalendarIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                    <h3 className="text-lg font-medium text-gray-900">No rooms available</h3>
-                    <p className="text-gray-500">Try adjusting your filters or search terms.</p>
+                <div className="text-center py-12 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-dashed border-gray-300 dark:border-slate-800 transition-colors">
+                    <CalendarIcon className="w-12 h-12 text-gray-400 dark:text-slate-600 mx-auto mb-3" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">ไม่พบห้องว่าง</h3>
+                    <p className="text-gray-500 dark:text-slate-400">กรุณาลองปรับฟิลเตอร์ หรือคำค้นหาใหม่อีกครั้ง</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
                     {filteredRooms.map((room: any) => (
                         <RoomCard key={room.id} room={room} onBook={handleBook} />
                     ))}
