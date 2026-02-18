@@ -12,6 +12,7 @@ import { supabase } from "../lib/supabaseClient";
 */
 
 import { useNavigate } from "react-router-dom";
+import ParticleBackground from "../components/ParticleBackground";
 
 const ALLOWED_DOMAIN = "chandra.ac.th";
 
@@ -122,27 +123,36 @@ const Login: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 transition-colors">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl dark:shadow-none p-8 w-full max-w-md border border-transparent dark:border-slate-800">
+        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+            {/* 3D Particle Background */}
+            <ParticleBackground />
+
+            <div className="
+                backdrop-blur-xl bg-white/10 dark:bg-slate-900/40 
+                rounded-3xl shadow-2xl p-8 w-full max-w-md 
+                border border-white/20 dark:border-slate-700/50
+                animate-in fade-in zoom-in duration-500
+                relative z-10
+            ">
 
                 {/* Header */}
                 <div className="text-center mb-8">
-                    <div className="bg-primary-100 dark:bg-primary-900/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <UserIcon className="w-8 h-8 text-primary-600 dark:text-primary-400" />
+                    <div className="bg-primary-500/20 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-primary-500/30">
+                        <UserIcon className="w-10 h-10 text-primary-400" />
                     </div>
 
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    <h1 className="text-3xl font-bold text-white mb-2">
                         เข้าสู่ระบบ
                     </h1>
 
-                    <p className="text-gray-500 dark:text-slate-400 mt-2">
+                    <p className="text-slate-300">
                         ระบบจองห้องประชุม มหาวิทยาลัยราชภัฏจันทรเกษม
                     </p>
                 </div>
 
                 {/* Error */}
                 {error && (
-                    <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-100 flex items-start mb-6">
+                    <div className="bg-red-500/20 text-red-100 p-4 rounded-xl text-sm border border-red-500/30 flex items-start mb-6 backdrop-blur-md">
                         <Lock className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                         {error}
                     </div>
@@ -154,12 +164,11 @@ const Login: React.FC = () => {
                     onClick={handleGoogleLogin}
                     disabled={loading}
                     className="
-            w-full py-3 rounded-lg font-semibold border
-            bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 border-gray-200 dark:border-slate-700
-            hover:bg-gray-50 dark:hover:bg-slate-700
-            transition-colors
+            w-full py-4 rounded-xl font-semibold border
+            bg-white/90 hover:bg-white text-slate-900 border-transparent
+            transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]
             flex items-center justify-center
-            shadow-sm
+            shadow-xl shadow-primary-500/10
             disabled:opacity-60
             disabled:cursor-not-allowed
           "
@@ -192,10 +201,10 @@ const Login: React.FC = () => {
                 </button>
 
                 {/* Footer */}
-                <div className="mt-6 pt-6 border-t border-gray-100 dark:border-slate-800">
-                    <p className="text-xs text-center text-gray-500 dark:text-slate-400">
+                <div className="mt-8 pt-6 border-t border-white/10">
+                    <p className="text-xs text-center text-slate-400">
                         กรุณาเข้าสู่ระบบด้วยบัญชี Google <br />
-                        <b>@{ALLOWED_DOMAIN}</b> เท่านั้น
+                        <b className="text-primary-400">@{ALLOWED_DOMAIN}</b> เท่านั้น
                     </p>
                 </div>
 
@@ -203,5 +212,6 @@ const Login: React.FC = () => {
         </div>
     );
 };
+
 
 export default Login;
