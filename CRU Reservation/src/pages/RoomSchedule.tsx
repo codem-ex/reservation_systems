@@ -102,9 +102,23 @@ const RoomSchedule = () => {
                     >
                         <ChevronLeft className="w-5 h-5" />
                     </button>
-                    <div className="px-4 font-semibold text-gray-900 dark:text-white min-w-[150px] text-center">
+                    <label
+                        className="px-4 font-semibold text-gray-900 dark:text-white min-w-[150px] text-center cursor-pointer hover:text-primary-600 transition-colors block relative"
+                        onClick={(e) => {
+                            const input = e.currentTarget.querySelector('input');
+                            if (input && 'showPicker' in input) {
+                                try { input.showPicker(); } catch (err) { console.error(err); }
+                            }
+                        }}
+                    >
                         {format(selectedDate, "eee d MMM yyyy", { locale: th })}
-                    </div>
+                        <input
+                            type="date"
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                            value={format(selectedDate, 'yyyy-MM-dd')}
+                            onChange={(e) => e.target.value && setSelectedDate(new Date(e.target.value))}
+                        />
+                    </label>
                     <button
                         onClick={() => setSelectedDate(addDays(selectedDate, 1))}
                         className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
@@ -189,18 +203,20 @@ const RoomSchedule = () => {
                 </div>
             </div>
 
-            <div className="flex items-center gap-6 text-sm text-gray-500 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm inline-flex">
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-emerald-500"></div>
-                    <span className="font-medium">อนุมัติแล้ว</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-amber-400"></div>
-                    <span className="font-medium">รออนุมัติ</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs opacity-60">
-                    <div className="w-3 h-3 border border-slate-200 dark:border-slate-700"></div>
-                    <span>ห้องว่าง / ว่าง</span>
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm inline-block">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-[12px_1fr] items-center gap-3 text-sm">
+                        <div className="w-3 h-3 rounded bg-emerald-500"></div>
+                        <span className="font-medium text-slate-600 dark:text-slate-400">อนุมัติแล้ว</span>
+                    </div>
+                    <div className="grid grid-cols-[12px_1fr] items-center gap-3 text-sm">
+                        <div className="w-3 h-3 rounded bg-amber-400"></div>
+                        <span className="font-medium text-slate-600 dark:text-slate-400">รออนุมัติ</span>
+                    </div>
+                    <div className="grid grid-cols-[12px_1fr] items-center gap-3 text-sm opacity-60">
+                        <div className="w-3 h-3 border border-slate-200 dark:border-slate-700"></div>
+                        <span className="font-medium text-slate-600 dark:text-slate-400">ห้องว่าง / ว่าง</span>
+                    </div>
                 </div>
             </div>
         </div>

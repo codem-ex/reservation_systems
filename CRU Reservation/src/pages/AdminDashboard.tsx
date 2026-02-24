@@ -20,6 +20,10 @@ type ProfileRow = {
 type RoomRow = {
     id: string;
     name: string;
+    location: string | null;
+    capacity: number | null;
+    status: string | null;
+    amenities: string[] | null;
 };
 
 type ReservationRow = {
@@ -106,6 +110,11 @@ const AdminDashboard = () => {
     const [timelineLoading, setTimelineLoading] = useState(false);
     const [timelineLogs, setTimelineLogs] = useState<ApprovalLog[]>([]);
 
+    // Quick Edit Amenities
+    const [amenityEditOpen, setAmenityEditOpen] = useState(false);
+    const [amenityEditText, setAmenityEditText] = useState("");
+    const [amenityEditTarget, setAmenityEditTarget] = useState<string | null>(null);
+
     /* ===============================
        Admin check
     =============================== */
@@ -161,7 +170,7 @@ const AdminDashboard = () => {
                     )
                     .order("created_at", { ascending: false }),
 
-                supabase.from("rooms").select("id,name").order("name", { ascending: true }),
+                supabase.from("rooms").select("id,name,location,capacity,status,amenities").order("name", { ascending: true }),
 
                 supabase
                     .from("profiles")
@@ -522,6 +531,42 @@ const AdminDashboard = () => {
         }
     };
 
+    const updateRoomStatus = async (roomId: string, newStatus: string) => {
+        try {
+            const { error } = await supabase
+                .from("rooms")
+                .update({ status: newStatus })
+                .eq("id", roomId);
+            if (error) throw error;
+            // Update local state for immediate feedback
+            setRooms(prev => prev.map(r => r.id === roomId ? { ...r, status: newStatus } : r));
+        } catch (e: any) {
+            alert("Error updating status: " + e.message);
+            loadAll();
+        }
+    };
+
+    const updateRoomAmenities = async (roomId: string, amenities: string[]) => {
+        try {
+            const { error } = await supabase
+                .from("rooms")
+                .update({ amenities })
+                .eq("id", roomId);
+            if (error) throw error;
+            setRooms(prev => prev.map(r => r.id === roomId ? { ...r, amenities } : r));
+            setAmenityEditOpen(false);
+        } catch (e: any) {
+            alert("Error updating amenities: " + e.message);
+            loadAll();
+        }
+    };
+
+    const openAmenityEdit = (room: RoomRow) => {
+        setAmenityEditTarget(room.id);
+        setAmenityEditText((room.amenities || []).join("\n"));
+        setAmenityEditOpen(true);
+    };
+
     /* ===============================
        Report Calculations
     =============================== */
@@ -763,6 +808,7 @@ const AdminDashboard = () => {
                                     <th className="p-4 text-sm font-semibold">สถานที่</th>
                                     <th className="p-4 text-sm font-semibold text-center">ความจุ</th>
                                     <th className="p-4 text-sm font-semibold">สถานะ</th>
+                                    <th className="p-4 text-sm font-semibold">อุปกรณ์</th>
                                     <th className="p-4 text-sm font-semibold text-right">จัดการ</th>
                                 </tr>
                             </thead>
@@ -770,21 +816,45 @@ const AdminDashboard = () => {
                                 {rooms.map(room => (
                                     <tr key={room.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
                                         <td className="p-4 text-sm font-medium">{room.name}</td>
-                                        <td className="p-4 text-sm text-gray-500">{(room as any).location || "-"}</td>
-                                        <td className="p-4 text-sm text-center">{(room as any).capacity || "-"}</td>
+                                        <td className="p-4 text-sm text-gray-500">{room.location || "-"}</td>
+                                        <td className="p-4 text-sm text-center">{room.capacity || "-"}</td>
                                         <td className="p-4 text-sm">
-                                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase
-                                                ${(room as any).status === 'available' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                                                {(room as any).status || 'unknown'}
-                                            </span>
+                                            <select
+                                                value={room.status || 'available'}
+                                                onChange={(e) => updateRoomStatus(room.id, e.target.value)}
+                                                className={`text-[10px] font-bold uppercase rounded-full px-2 py-1 border-none focus:ring-2 focus:ring-primary-500 cursor-pointer
+                                                    ${room.status === 'available' ? 'bg-emerald-100 text-emerald-700' :
+                                                        room.status === 'unavailable' ? 'bg-red-100 text-red-700' :
+                                                            'bg-yellow-100 text-yellow-700'}`}
+                                            >
+                                                <option value="available">Available</option>
+                                                <option value="unavailable">Unavailable</option>
+                                                <option value="maintenance">Maintenance</option>
+                                            </select>
+                                        </td>
+                                        <td className="p-4 text-sm">
+                                            <div className="flex flex-wrap items-center gap-1 group cursor-pointer" onClick={() => openAmenityEdit(room)}>
+                                                {(room.amenities || []).slice(0, 3).map((a, i) => (
+                                                    <span key={i} className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">
+                                                        {a}
+                                                    </span>
+                                                ))}
+                                                {(room.amenities || []).length > 3 && (
+                                                    <span className="text-[10px] text-slate-400">+{(room.amenities || []).length - 3}</span>
+                                                )}
+                                                {(room.amenities || []).length === 0 && <span className="text-gray-400">-</span>}
+                                                <Edit2 className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 text-primary-600" />
+                                            </div>
                                         </td>
                                         <td className="p-4 text-right">
-                                            <Link
-                                                to={`/admin/rooms/edit/${room.id}`}
-                                                className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium text-sm"
-                                            >
-                                                <Edit2 className="w-3 h-3" /> แก้ไข
-                                            </Link>
+                                            <div className="flex justify-end gap-3">
+                                                <Link
+                                                    to={`/admin/rooms/edit/${room.id}`}
+                                                    className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium text-sm"
+                                                >
+                                                    <Edit2 className="w-3 h-3" /> แก้ไข
+                                                </Link>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -1086,6 +1156,39 @@ const AdminDashboard = () => {
                                     })}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Amenity Edit Modal */}
+            {amenityEditOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl transform animate-in zoom-in-95 duration-200 border dark:border-slate-800">
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">แก้ไขอุปกรณ์ภายในห้อง</h3>
+                        <p className="text-xs text-slate-500 mb-2">ใส่รายการอุปกรณ์หนึ่งรายการต่อหนึ่งบรรทัด</p>
+                        <textarea
+                            value={amenityEditText}
+                            onChange={(e) => setAmenityEditText(e.target.value)}
+                            rows={8}
+                            className="w-full p-4 border rounded-2xl dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none mb-6"
+                        />
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setAmenityEditOpen(false)}
+                                className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const lines = amenityEditText.split('\n').map(l => l.trim()).filter(Boolean);
+                                    if (amenityEditTarget) updateRoomAmenities(amenityEditTarget, lines);
+                                }}
+                                className="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-primary-200 dark:shadow-none"
+                            >
+                                บันทึก
+                            </button>
                         </div>
                     </div>
                 </div>

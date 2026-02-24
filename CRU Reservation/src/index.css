@@ -7,6 +7,11 @@
 */
 @variant dark (&:where(.dark, .dark *));
 
+/* 
+  🎨 Tailwind v4 Theme Configuration 
+  NOTE: IDEs may show "Unknown at-rule" warnings for @theme. 
+  This is standard Tailwind v4 syntax and safe to ignore.
+*/
 @theme {
   --color-primary-50: var(--color-indigo-50);
   --color-primary-100: var(--color-indigo-100);
@@ -370,6 +375,10 @@
   }
 }
 
+/* 
+  🛠️ Tailwind Utilities Layer 
+  NOTE: IDEs may show warnings for @apply in CSS files.
+*/
 @layer utilities {
   .glass {
     @apply bg-white/70 backdrop-blur-md border border-white/20;

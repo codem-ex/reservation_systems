@@ -18,35 +18,34 @@ type Reservation = {
         decision: string;
         decision_note: string | null;
     }[];
-};
-
-type Room = {
-    id: string;
-    name: string;
-    type: string;
+    rooms?: {
+        id: string;
+        name: string;
+        location: string | null;
+    } | null;
 };
 
 const MyBookings = () => {
     const { user } = useAuth();
     const [bookings, setBookings] = useState<Reservation[]>([]);
-    const [rooms, setRooms] = useState<Room[]>([]);
     const [loading, setLoading] = useState(true);
 
     const fetchData = async () => {
         if (!user) return;
         setLoading(true);
         try {
-            const [resBookings, resRooms] = await Promise.all([
-                supabase
-                    .from('reservations')
-                    .select('*, reservation_approvals(decision, decision_note)')
-                    .eq('requester_id', user.id)
-                    .order('created_at', { ascending: false }),
-                supabase.from('rooms').select('id, name, type')
-            ]);
+            const { data, error } = await supabase
+                .from('reservations')
+                .select(`
+                    *, 
+                    room:rooms(id, name, location),
+                    reservation_approvals(decision, decision_note)
+                `)
+                .eq('requester_id', user.id)
+                .order('created_at', { ascending: false });
 
-            if (resBookings.data) setBookings(resBookings.data as Reservation[]);
-            if (resRooms.data) setRooms(resRooms.data as Room[]);
+            if (error) throw error;
+            if (data) setBookings(data as any[]);
         } catch (error) {
             console.error(error);
         } finally {
@@ -110,7 +109,9 @@ const MyBookings = () => {
                 ) : (
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
                         {bookings.map(booking => {
-                            const room = rooms.find(r => r.id === booking.room_id);
+                            const room = (booking as any).room || (booking as any).rooms;
+                            const roomName = room?.name || `ไม่ทราบชื่อห้อง (${booking.room_id.slice(0, 8)})`;
+                            const roomLocation = room?.location || 'ไม่ระบุสถานที่';
                             const startDate = new Date(booking.start_at);
                             const endDate = new Date(booking.end_at);
                             const rejection = booking.reservation_approvals?.find(a => a.decision === 'REJECTED');
@@ -148,7 +149,7 @@ const MyBookings = () => {
                                         <div className="space-y-2 flex-1">
                                             <div className="flex items-center gap-3">
                                                 <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                                                    {room?.name || 'ไม่ทราบชื่อห้อง'}
+                                                    {roomName}
                                                 </h3>
                                                 <span className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${getStatusColor(booking.status)}`}>
                                                     {getStatusThai(booking.status)}
@@ -192,7 +193,7 @@ const MyBookings = () => {
                                             </div>
                                             <div className="flex items-center bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg md:bg-transparent md:p-0">
                                                 <MapPin className="w-4 h-4 mr-2 text-primary-500 dark:text-primary-400" />
-                                                {room?.type || 'ห้องประชุม'}
+                                                {roomLocation}
                                             </div>
                                         </div>
                                     </div>
