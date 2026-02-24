@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
-import { Bell, Check, Clock, Trash2, Loader2 } from "lucide-react";
+import { Bell, Check, Clock, Trash2, Loader2, AlertCircle } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../lib/auth";
+import { useNavigate } from "react-router-dom";
 
 type Notification = {
     id: string;
@@ -16,6 +17,7 @@ type Notification = {
 
 const Notifications = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -29,7 +31,20 @@ const Notifications = () => {
                 .eq("user_id", user.id)
                 .order("created_at", { ascending: false });
 
-            if (data) setNotifications(data as Notification[]);
+            if (data) {
+                setNotifications(data as Notification[]);
+
+                // Auto mark all unread as read when page loads
+                const hasUnread = (data as Notification[]).some(n => !n.is_read);
+                if (hasUnread) {
+                    await supabase
+                        .from("notifications")
+                        .update({ is_read: true })
+                        .eq("user_id", user.id)
+                        .eq("is_read", false);
+                    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+                }
+            }
         } catch (error) {
             console.error(error);
         } finally {
@@ -55,6 +70,16 @@ const Notifications = () => {
     const deleteNotification = async (id: string) => {
         await supabase.from("notifications").delete().eq("id", id);
         setNotifications(prev => prev.filter(n => n.id !== id));
+    };
+
+    const handleNotificationClick = (n: Notification) => {
+        if (!n.is_read) markAsRead(n.id);
+
+        if (n.title.includes("จองห้องใหม่") || n.type === "new_reservation") {
+            navigate("/admin");
+        } else if (n.title.includes("อนุมัติ") || n.title.includes("ปฏิเสธ")) {
+            navigate("/bookings");
+        }
     };
 
     if (loading) {
@@ -101,9 +126,22 @@ const Notifications = () => {
                                 key={n.id}
                                 className={`p-6 flex gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group ${!n.is_read ? 'bg-indigo-50/30 dark:bg-indigo-900/10' : ''}`}
                             >
-                                <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0
-                                    ${n.title.includes('อนุมัติ') ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'}`}>
-                                    {n.title.includes('อนุมัติ') ? <Check className="w-6 h-6" /> : <Clock className="w-6 h-6" />}
+                                <div
+                                    className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer
+                                    ${n.title.includes('อนุมัติ')
+                                            ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
+                                            : n.title.includes('ปฏิเสธ')
+                                                ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                                                : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'}`}
+                                    onClick={() => handleNotificationClick(n)}
+                                >
+                                    {n.title.includes('อนุมัติ') ? (
+                                        <Check className="w-6 h-6" />
+                                    ) : n.title.includes('ปฏิเสธ') ? (
+                                        <AlertCircle className="w-6 h-6" />
+                                    ) : (
+                                        <Clock className="w-6 h-6" />
+                                    )}
                                 </div>
                                 <div className="flex-1">
                                     <div className="flex justify-between items-start">
@@ -112,7 +150,12 @@ const Notifications = () => {
                                             {format(new Date(n.created_at), "d MMMM yyyy HH:mm", { locale: th })}
                                         </div>
                                     </div>
-                                    <p className="text-slate-600 dark:text-slate-400 mt-1">{n.message}</p>
+                                    <p
+                                        className="text-slate-600 dark:text-slate-400 mt-1 cursor-pointer"
+                                        onClick={() => handleNotificationClick(n)}
+                                    >
+                                        {n.message}
+                                    </p>
                                     <div className="mt-3 flex gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
                                         {!n.is_read && (
                                             <button

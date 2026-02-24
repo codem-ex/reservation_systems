@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
-import { LayoutDashboard, Search, CalendarDays, LogOut, Moon, Sun, Settings } from "lucide-react";
+import { LayoutDashboard, Search, CalendarDays, LogOut, Moon, Sun, Settings, HelpCircle } from "lucide-react";
 import NotificationBell from "../components/NotificationBell";
 import AppParticles from "../components/AppParticles";
 
@@ -133,6 +133,11 @@ export default function MainLayout() {
                             <NavLink to="/admin" className={navItemClass}>
                                 <Settings className="w-5 h-5 mr-3" />
                                 จัดการระบบ
+                            </NavLink>
+
+                            <NavLink to="/help" className={navItemClass}>
+                                <HelpCircle className="w-5 h-5 mr-3" />
+                                คู่มือการใช้งาน
                             </NavLink>
                         </nav>
 

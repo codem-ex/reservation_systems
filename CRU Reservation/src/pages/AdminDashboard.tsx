@@ -48,6 +48,7 @@ type ReservationRow = {
         stage_no: number;
         approver_user_id: string;
         decision: string;
+        decision_note: string | null;
     }[];
 };
 
@@ -90,7 +91,7 @@ const AdminDashboard = () => {
     const [profiles, setProfiles] = useState<ProfileRow[]>([]);
     const [steps, setSteps] = useState<ChainStep[]>([]);
     const [errorMsg, setErrorMsg] = useState("");
-    const [activeTab, setActiveTab] = useState<"reservations" | "rooms" | "reports">("reservations");
+    const [activeTab, setActiveTab] = useState<"reservations" | "rooms" | "reports" | "users">("reservations");
     const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 
 
@@ -156,7 +157,7 @@ const AdminDashboard = () => {
                 supabase
                     .from("reservations")
                     .select(
-                        "*, reservation_approvals(id, stage_no, approver_user_id, decision)"
+                        "*, reservation_approvals(id, stage_no, approver_user_id, decision, decision_note)"
                     )
                     .order("created_at", { ascending: false }),
 
@@ -190,8 +191,20 @@ const AdminDashboard = () => {
     };
 
     useEffect(() => {
-        if (supabaseUser?.id) loadAll();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        if (!supabaseUser?.id) return;
+
+        loadAll();
+
+        // Listen for changes in reservations and approvals to update dashboard in real-time
+        const channel = supabase
+            .channel('admin_dashboard_realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => loadAll())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'reservation_approvals' }, () => loadAll())
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [supabaseUser?.id]);
 
     /* ===============================
@@ -492,6 +505,46 @@ const AdminDashboard = () => {
         }
     };
 
+    const toggleAdmin = async (profileId: string, currentStatus: boolean) => {
+        if (!isAdmin) return;
+        if (profileId === supabaseUser?.id) return alert("You cannot change your own admin status");
+
+        try {
+            const { error } = await supabase
+                .from("profiles")
+                .update({ is_admin: !currentStatus })
+                .eq("id", profileId);
+
+            if (error) throw error;
+            loadAll();
+        } catch (e: any) {
+            alert(e.message);
+        }
+    };
+
+    /* ===============================
+       Report Calculations
+    =============================== */
+    const stats = useMemo(() => {
+        const total = reservations.length;
+        const approved = reservations.filter(r => r.status === 'APPROVED').length;
+        const rejected = reservations.filter(r => r.status === 'REJECTED').length;
+        const cancelled = reservations.filter(r => r.status === 'CANCELLED').length;
+        const pending = reservations.filter(r => r.status === 'PENDING').length;
+
+        // Room popularity
+        const roomPop: Record<string, number> = {};
+        reservations.forEach(r => {
+            roomPop[r.room_id] = (roomPop[r.room_id] || 0) + 1;
+        });
+        const topRooms = Object.entries(roomPop)
+            .map(([id, count]) => ({ id, count, name: roomById.get(id)?.name || 'Unknown' }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
+        return { total, approved, rejected, cancelled, pending, topRooms };
+    }, [reservations, roomById]);
+
     /* ===============================
        UI states
     =============================== */
@@ -567,6 +620,12 @@ const AdminDashboard = () => {
                     >
                         รายงานและสถิติ
                     </button>
+                    <button
+                        onClick={() => setActiveTab("users")}
+                        className={`px-6 py-3 font-semibold transition-colors ${activeTab === 'users' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
+                    >
+                        จัดการผู้ใช้งาน
+                    </button>
                 </div>
             )}
 
@@ -582,11 +641,11 @@ const AdminDashboard = () => {
 
                         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors">
                             {visiblePendingRows.length === 0 ? (
-                                <div className="p-6 text-center text-gray-500">
+                                <div className="p-6 text-center text-gray-500 dark:text-slate-400">
                                     {isAdmin ? "No pending requests." : "ยังไม่มีรายการรออนุมัติของคุณ"}
                                 </div>
                             ) : (
-                                <div className="divide-y divide-slate-100">
+                                <div className="divide-y divide-slate-100 dark:divide-slate-800">
                                     {visiblePendingRows.map((row) => {
                                         const r = row.r;
                                         const room = row.room;
@@ -609,18 +668,18 @@ const AdminDashboard = () => {
                                             >
                                                 <div className="min-w-0">
                                                     <div className="flex flex-wrap items-center gap-2 mb-1">
-                                                        <span className="font-bold text-gray-900">{room?.name ?? "-"}</span>
-                                                        <span className="text-gray-400">•</span>
+                                                        <span className="font-bold text-gray-900 dark:text-white">{room?.name ?? "-"}</span>
+                                                        <span className="text-gray-400 dark:text-slate-500">•</span>
                                                         <span className="text-primary-600 font-medium">
                                                             {user?.display_name ?? user?.email ?? r.requester_id}
                                                         </span>
-                                                        <span className="text-gray-400">•</span>
-                                                        <span className="text-xs bg-slate-100 px-2 py-0.5 rounded">
+                                                        <span className="text-gray-400 dark:text-slate-500">•</span>
+                                                        <span className="text-xs bg-slate-100 dark:bg-slate-800 dark:text-slate-300 px-2 py-0.5 rounded">
                                                             Stage {r.current_stage}
                                                         </span>
 
                                                         {approverProfile && (
-                                                            <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
+                                                            <span className="text-xs bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 px-2 py-0.5 rounded border border-indigo-100 dark:border-indigo-800/50">
                                                                 ผู้อนุมัติขั้นนี้: {approverProfile.display_name ?? approverProfile.email}
                                                             </span>
                                                         )}
@@ -628,18 +687,18 @@ const AdminDashboard = () => {
                                                         <button
                                                             type="button"
                                                             onClick={() => openTimeline(row)}
-                                                            className="ml-0 lg:ml-2 text-xs px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 flex items-center gap-1"
+                                                            className="ml-0 lg:ml-2 text-xs px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 dark:text-slate-300 flex items-center gap-1"
                                                         >
                                                             <MessageSquare className="w-4 h-4" />
                                                             Timeline
                                                         </button>
                                                     </div>
 
-                                                    <p className="text-gray-600 text-sm mb-2">
-                                                        <b className="text-gray-800">{r.title}</b> — {r.purpose}
+                                                    <p className="text-gray-600 dark:text-slate-400 text-sm mb-2">
+                                                        <b className="text-gray-800 dark:text-slate-200">{r.title}</b> — {r.purpose}
                                                     </p>
 
-                                                    <div className="flex flex-wrap items-center text-sm text-gray-500 gap-4">
+                                                    <div className="flex flex-wrap items-center text-sm text-gray-500 dark:text-slate-400 gap-4">
                                                         <span className="flex items-center">
                                                             <Calendar className="w-4 h-4 mr-1.5" />
                                                             {format(new Date(r.start_at), "dd/MM/yyyy")}
@@ -651,7 +710,7 @@ const AdminDashboard = () => {
                                                         </span>
 
                                                         {r.setup_start_at && r.setup_end_at && (
-                                                            <span className="text-xs bg-yellow-50 text-yellow-800 px-2 py-0.5 rounded border border-yellow-200">
+                                                            <span className="text-xs bg-yellow-50 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 px-2 py-0.5 rounded border border-yellow-200 dark:border-yellow-800/50">
                                                                 Setup: {format(new Date(r.setup_start_at), "dd/MM HH:mm")} -{" "}
                                                                 {format(new Date(r.setup_end_at), "dd/MM HH:mm")}
                                                             </span>
@@ -783,8 +842,8 @@ const AdminDashboard = () => {
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">ประวัติการจอง</h2>
 
 
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div className="divide-y divide-slate-100">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
                             {pastRows.slice(0, 10).map((row) => {
                                 const r = row.r;
                                 const room = row.room;
@@ -793,24 +852,31 @@ const AdminDashboard = () => {
                                 return (
                                     <div key={r.id} className="p-4 flex justify-between items-center text-sm">
                                         <div className="min-w-0">
-                                            <span className="font-medium">{room?.name ?? "-"}</span>
-                                            <span className="mx-2 text-gray-300">|</span>
-                                            <span className="text-gray-600">{user?.display_name ?? user?.email ?? "-"}</span>
-                                            <span className="mx-2 text-gray-300">|</span>
-                                            <span className="text-gray-500">{format(new Date(r.start_at), "dd/MM/yyyy HH:mm")}</span>
+                                            <span className="font-medium dark:text-white">{room?.name ?? "-"}</span>
+                                            <span className="mx-2 text-gray-300 dark:text-slate-600">|</span>
+                                            <span className="text-gray-600 dark:text-slate-400">{user?.display_name ?? user?.email ?? "-"}</span>
+                                            <span className="mx-2 text-gray-300 dark:text-slate-600">|</span>
+                                            <span className="text-gray-500 dark:text-slate-500">{format(new Date(r.start_at), "dd/MM/yyyy HH:mm")}</span>
                                         </div>
 
-                                        <span
-                                            className={
-                                                r.status === "APPROVED"
-                                                    ? "text-green-600"
-                                                    : r.status === "REJECTED"
-                                                        ? "text-red-600"
-                                                        : "text-gray-600"
-                                            }
-                                        >
-                                            {r.status}
-                                        </span>
+                                        <div className="flex flex-col items-end">
+                                            <span
+                                                className={
+                                                    r.status === "APPROVED"
+                                                        ? "text-green-600 dark:text-emerald-400"
+                                                        : r.status === "REJECTED"
+                                                            ? "text-red-600 dark:text-red-400"
+                                                            : "text-gray-600 dark:text-slate-400"
+                                                }
+                                            >
+                                                {r.status}
+                                            </span>
+                                            {r.status === "REJECTED" && (
+                                                <div className="text-[10px] text-red-500 mt-0.5 max-w-[150px] truncate" title={r.reservation_approvals?.find((a: any) => a.decision === "REJECTED")?.decision_note || undefined}>
+                                                    {r.reservation_approvals?.find((a: any) => a.decision === "REJECTED")?.decision_note || "ไม่ระบุเหตุผล"}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -819,8 +885,108 @@ const AdminDashboard = () => {
                 </section>
             )}
 
+            {activeTab === "reports" && isAdmin && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    {/* Stat Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">ทั้งหมด</div>
+                            <div className="text-3xl font-bold dark:text-white">{stats.total}</div>
+                            <div className="text-xs text-slate-400 mt-1">รายการสะสม</div>
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div className="text-sm font-medium text-emerald-500 mb-1">อนุมัติแล้ว</div>
+                            <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{stats.approved}</div>
+                            <div className="text-xs text-slate-400 mt-1">{((stats.approved / (stats.total || 1)) * 100).toFixed(1)}% ของทั้งหมด</div>
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div className="text-sm font-medium text-red-500 mb-1">ปฏิเสธแล้ว</div>
+                            <div className="text-3xl font-bold text-red-600 dark:text-red-400">{stats.rejected}</div>
+                            <div className="text-xs text-slate-400 mt-1">{((stats.rejected / (stats.total || 1)) * 100).toFixed(1)}% ของทั้งหมด</div>
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div className="text-sm font-medium text-amber-500 mb-1">รออนุมัติ</div>
+                            <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">{stats.pending}</div>
+                            <div className="text-xs text-slate-400 mt-1">รายการคงค้าง</div>
+                        </div>
+                    </div>
+
+                    {/* Popular Rooms */}
+                    <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">5 อันดับห้องประชุมที่ถูกใช้งานมากที่สุด</h3>
+                        <div className="space-y-4">
+                            {stats.topRooms.map((room, idx) => (
+                                <div key={room.id} className="flex items-center gap-4">
+                                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 text-sm">
+                                        {idx + 1}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex justify-between mb-1.5">
+                                            <span className="font-medium dark:text-slate-200">{room.name}</span>
+                                            <span className="text-slate-500 dark:text-slate-400 text-sm">{room.count} ครั้ง</span>
+                                        </div>
+                                        <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-primary-500 rounded-full transition-all duration-1000"
+                                                style={{ width: `${(room.count / (stats.topRooms[0]?.count || 1)) * 100}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === "users" && isAdmin && (
+                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 dark:bg-slate-800/50 border-b dark:border-slate-800">
+                                <tr>
+                                    <th className="px-6 py-4 text-sm font-bold text-slate-700 dark:text-slate-200">ชื่อผู้ใช้งาน</th>
+                                    <th className="px-6 py-4 text-sm font-bold text-slate-700 dark:text-slate-200">อีเมล</th>
+                                    <th className="px-6 py-4 text-sm font-bold text-slate-700 dark:text-slate-200">สิทธิ์ Admin</th>
+                                    <th className="px-6 py-4 text-sm font-bold text-slate-700 dark:text-slate-200">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {profiles.map(p => (
+                                    <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="font-medium text-slate-900 dark:text-white">{p.display_name || '-'}</div>
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-sm">{p.email}</td>
+                                        <td className="px-6 py-4">
+                                            {p.is_admin ? (
+                                                <span className="px-2 py-1 rounded-md bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-xs font-bold">YES</span>
+                                            ) : (
+                                                <span className="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-bold">NO</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {p.id !== supabaseUser.id ? (
+                                                <button
+                                                    onClick={() => toggleAdmin(p.id, p.is_admin || false)}
+                                                    className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${p.is_admin ? 'border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-900/20' : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50 dark:border-indigo-900 dark:hover:bg-indigo-900/20'}`}
+                                                >
+                                                    {p.is_admin ? 'ถอดสิทธิ์ Admin' : 'แต่งตั้งเป็น Admin'}
+                                                </button>
+                                            ) : (
+                                                <span className="text-xs text-slate-400 italic">บัญชีของคุณ</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
             {errorMsg && (
-                <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl p-4">
+                <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-xl p-4">
                     {errorMsg}
                 </div>
             )}
@@ -828,12 +994,12 @@ const AdminDashboard = () => {
             {/* Reject modal */}
             {rejectOpen && (
                 <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4">
-                    <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl overflow-hidden">
-                        <div className="flex items-center justify-between px-5 py-4 border-b">
-                            <div className="font-semibold text-gray-900">ระบุเหตุผลการปฏิเสธ (บังคับ)</div>
+                    <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-xl overflow-hidden border dark:border-slate-800">
+                        <div className="flex items-center justify-between px-5 py-4 border-b dark:border-slate-800">
+                            <div className="font-semibold text-gray-900 dark:text-white">ระบุเหตุผลการปฏิเสธ (บังคับ)</div>
                             <button
                                 onClick={() => setRejectOpen(false)}
-                                className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center"
+                                className="w-9 h-9 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center dark:text-slate-400"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -844,7 +1010,7 @@ const AdminDashboard = () => {
                                 rows={4}
                                 value={rejectReason}
                                 onChange={(e) => setRejectReason(e.target.value)}
-                                className="w-full border rounded-xl p-3 text-sm"
+                                className="w-full border dark:border-slate-700 rounded-xl p-3 text-sm dark:bg-slate-800 dark:text-white"
                                 placeholder="โปรดระบุเหตุผล เช่น เวลาชน / วัตถุประสงค์ไม่ชัดเจน / เอกสารไม่ครบ"
                             />
 
@@ -853,7 +1019,7 @@ const AdminDashboard = () => {
                                     type="button"
                                     disabled={processingIds.has(rejectTarget?.r?.id ?? "")}
                                     onClick={() => setRejectOpen(false)}
-                                    className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-50"
+                                    className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 dark:text-slate-300 disabled:opacity-50"
                                 >
                                     ยกเลิก
                                 </button>
@@ -874,15 +1040,15 @@ const AdminDashboard = () => {
             {/* Timeline modal */}
             {timelineOpen && (
                 <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4">
-                    <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl overflow-hidden">
-                        <div className="flex items-center justify-between px-5 py-4 border-b">
+                    <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-xl overflow-hidden border dark:border-slate-800">
+                        <div className="flex items-center justify-between px-5 py-4 border-b dark:border-slate-800">
                             <div>
-                                <div className="text-xs text-gray-500">Timeline</div>
-                                <div className="font-semibold text-gray-900">{timelineTitle}</div>
+                                <div className="text-xs text-gray-500 dark:text-slate-400">Timeline</div>
+                                <div className="font-semibold text-gray-900 dark:text-white">{timelineTitle}</div>
                             </div>
                             <button
                                 onClick={() => setTimelineOpen(false)}
-                                className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center"
+                                className="w-9 h-9 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center dark:text-slate-400"
                             >
                                 <X className="w-5 h-5" />
                             </button>
@@ -890,28 +1056,28 @@ const AdminDashboard = () => {
 
                         <div className="p-5">
                             {timelineLoading ? (
-                                <div className="text-center text-gray-500 py-10">Loading timeline...</div>
+                                <div className="text-center text-gray-500 dark:text-slate-400 py-10">Loading timeline...</div>
                             ) : timelineLogs.length === 0 ? (
-                                <div className="text-center text-gray-500 py-10">ยังไม่มีการตัดสินใจในระบบ</div>
+                                <div className="text-center text-gray-500 dark:text-slate-400 py-10">ยังไม่มีการตัดสินใจในระบบ</div>
                             ) : (
                                 <div className="space-y-3">
                                     {timelineLogs.map((l) => {
                                         const who = profileById.get(l.approver_user_id);
                                         return (
-                                            <div key={l.id} className="border rounded-xl p-4">
+                                            <div key={l.id} className="border dark:border-slate-700 rounded-xl p-4">
                                                 <div className="flex justify-between flex-wrap gap-2">
-                                                    <div className="font-medium">
+                                                    <div className="font-medium dark:text-white">
                                                         Stage {l.stage_no} • {l.decision}
                                                     </div>
-                                                    <div className="text-xs text-gray-500">
+                                                    <div className="text-xs text-gray-500 dark:text-slate-400">
                                                         {l.decided_at ? format(new Date(l.decided_at), "dd/MM/yyyy HH:mm") : ""}
                                                     </div>
                                                 </div>
-                                                <div className="text-sm text-gray-600 mt-1">
+                                                <div className="text-sm text-gray-600 dark:text-slate-400 mt-1">
                                                     โดย: {who?.display_name ?? who?.email ?? l.approver_user_id}
                                                 </div>
                                                 {l.decision === "REJECTED" && l.decision_note && (
-                                                    <div className="text-sm mt-2 text-red-700 bg-red-50 border border-red-100 rounded-lg p-3">
+                                                    <div className="text-sm mt-2 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/50 rounded-lg p-3">
                                                         เหตุผล: {l.decision_note}
                                                     </div>
                                                 )}

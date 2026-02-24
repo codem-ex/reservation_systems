@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X, User as UserIcon, Check, Maximize2, Layers } from "lucide-react";
 
 import dayjs from "dayjs";
@@ -99,6 +99,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
     const [loading, setLoading] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [existingReservations, setExistingReservations] = useState<any[]>([]);
+    const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
 
     /* ===== Lightbox ===== */
     const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -148,6 +150,34 @@ const BookingModal: React.FC<BookingModalProps> = ({
         }
     };
 
+    const fetchExisting = async () => {
+        try {
+            const { data } = await supabase
+                .from("reservations")
+                .select("start_at, end_at, status")
+                .eq("room_id", room.id)
+                .in("status", ["PENDING", "APPROVED"]);
+            if (data) setExistingReservations(data);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    useEffect(() => {
+        fetchExisting();
+    }, [room.id]);
+
+    const hasConflict = useMemo(() => {
+        const start = dayjs(buildISO(useStart, startTime));
+        const end = dayjs(buildISO(useEnd, endTime, true));
+
+        return existingReservations.some(r => {
+            const rStart = dayjs(r.start_at);
+            const rEnd = dayjs(r.end_at);
+            return start.isBefore(rEnd) && end.isAfter(rStart);
+        });
+    }, [useStart, useEnd, startTime, endTime, existingReservations]);
+
     const validate = () => {
         if (!title.trim()) return "กรุณาระบุหัวข้อการขอใช้ห้องประชุม";
         if (!purpose.trim()) return "กรุณาระบุวัตถุประสงค์การใช้งาน";
@@ -161,6 +191,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
         const setE = timeToMinutes(setupEnd);
         if (!Number.isFinite(setS) || !Number.isFinite(setE)) return "เวลาจัดเตรียมไม่ถูกต้อง";
         if (setS >= setE) return "เวลาจัดเตรียม: เวลาเริ่มต้องน้อยกว่าเวลาสิ้นสุด";
+
+        if (hasConflict) return "ช่วงเวลานี้ถูกจองไปแล้ว กรุณาเลือกเวลาอื่น";
 
         return "";
     };
@@ -184,6 +216,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     purpose.trim(),
                     agenda.trim() ? `\n(วาระการประชุม: ${agenda.trim()})` : "",
                     guestCount > 1 ? `\n(จำนวนผู้เข้าร่วม: ${guestCount} คน)` : "",
+                    selectedAmenities.length > 0 ? `\n(อุปกรณ์ที่ต้องการ: ${selectedAmenities.join(", ")})` : "",
                 ].filter(Boolean).join("\n"),
 
                 start_at: buildISO(useStart, startTime),
@@ -267,7 +300,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     className="grid grid-cols-1 lg:grid-cols-2 gap-8 px-8 py-6 max-h-[80vh] overflow-y-auto"
                 >
                     {/* LEFT */}
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                         {/* Room Preview Image */}
                         {allImages.length > 0 && (
                             <div
@@ -304,40 +337,43 @@ const BookingModal: React.FC<BookingModalProps> = ({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <button
-                                type="button"
-                                onClick={() => setActive("use")}
-                                className={`p-4 rounded-2xl border text-left transition-colors ${active === "use" ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700" : "bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700"
-                                    }`}
-                            >
-                                <div className="text-xs text-gray-500 dark:text-slate-400">ช่วงวันใช้งาน</div>
-                                <div className={`font-semibold ${active === "use" ? "text-indigo-700 dark:text-indigo-400" : "text-slate-600 dark:text-slate-400"}`}>{labelUse}</div>
-                            </button>
+                        {/* Date selection section - centered and width-matched to calendar */}
+                        <div className="w-[332px] mx-auto space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setActive("setup")}
+                                    className={`p-3 rounded-2xl border text-left transition-colors ${active === "setup" ? "bg-yellow-50 dark:bg-yellow-900/30 border-yellow-300 dark:border-yellow-700" : "bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700"
+                                        }`}
+                                >
+                                    <div className="text-[10px] text-gray-500 dark:text-slate-400">ช่วงวันจัดเตรียม</div>
+                                    <div className={`font-semibold text-sm ${active === "setup" ? "text-yellow-700 dark:text-yellow-400" : "text-slate-600 dark:text-slate-400"}`}>{labelSetup}</div>
+                                </button>
 
-                            <button
-                                type="button"
-                                onClick={() => setActive("setup")}
-                                className={`p-4 rounded-2xl border text-left transition-colors ${active === "setup" ? "bg-yellow-50 dark:bg-yellow-900/30 border-yellow-300 dark:border-yellow-700" : "bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700"
-                                    }`}
-                            >
-                                <div className="text-xs text-gray-500 dark:text-slate-400">ช่วงวันจัดเตรียม</div>
-                                <div className={`font-semibold ${active === "setup" ? "text-yellow-700 dark:text-yellow-400" : "text-slate-600 dark:text-slate-400"}`}>{labelSetup}</div>
-                            </button>
-                        </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setActive("use")}
+                                    className={`p-3 rounded-2xl border text-left transition-colors ${active === "use" ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700" : "bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700"
+                                        }`}
+                                >
+                                    <div className="text-[10px] text-gray-500 dark:text-slate-400">ช่วงวันใช้งาน</div>
+                                    <div className={`font-semibold text-sm ${active === "use" ? "text-indigo-700 dark:text-indigo-400" : "text-slate-600 dark:text-slate-400"}`}>{labelUse}</div>
+                                </button>
+                            </div>
 
-                        <div className="rounded-2xl border overflow-hidden">
-                            <DateRange
-                                locale={th}
-                                ranges={[useRange, setupRange]}
-                                onChange={onRangeChange}
-                                focusedRange={active === "use" ? [0, 0] : [1, 0]}
-                                showDateDisplay={false}
-                                months={1}
-                                direction="horizontal"
-                                rangeColors={["#4f46e5", "#f59e0b"]}
-                                minDate={startOfDay(new Date())}
-                            />
+                            <div className="rounded-2xl border overflow-hidden shadow-sm bg-white dark:bg-slate-900 flex justify-center">
+                                <DateRange
+                                    locale={th}
+                                    ranges={[useRange, setupRange]}
+                                    onChange={onRangeChange}
+                                    focusedRange={active === "use" ? [0, 0] : [1, 0]}
+                                    showDateDisplay={false}
+                                    months={1}
+                                    direction="horizontal"
+                                    rangeColors={["#4f46e5", "#f59e0b"]}
+                                    minDate={startOfDay(new Date())}
+                                />
+                            </div>
                         </div>
 
                         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-2xl p-4">
@@ -374,13 +410,41 @@ const BookingModal: React.FC<BookingModalProps> = ({
                             <div>
                                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">วัตถุประสงค์การใช้งาน</label>
                                 <textarea
-                                    rows={4}
+                                    rows={3}
                                     value={purpose}
                                     onChange={(e) => setPurpose(e.target.value)}
                                     className="mt-2 w-full border rounded-xl p-3 dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
                                     placeholder="เช่น เพื่อประชุมวางแผนงบประมาณ..."
                                 />
                             </div>
+
+                            {/* Amenity Selection */}
+                            {Array.isArray(room.amenities) && room.amenities.length > 0 && (
+                                <div>
+                                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">อุปกรณ์/สิ่งอำนวยความสะดวกที่ต้องการ</label>
+                                    <div className="mt-3 grid grid-cols-2 gap-3">
+                                        {room.amenities.map((a: string) => (
+                                            <button
+                                                key={a}
+                                                type="button"
+                                                onClick={() => setSelectedAmenities(prev =>
+                                                    prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a]
+                                                )}
+                                                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-medium transition-all ${selectedAmenities.includes(a)
+                                                    ? 'bg-primary-50 border-primary-300 text-primary-700 dark:bg-primary-900/20 dark:border-primary-800 dark:text-primary-400'
+                                                    : 'bg-white border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400'
+                                                    }`}
+                                            >
+                                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${selectedAmenities.includes(a) ? 'bg-primary-600 border-primary-600' : 'bg-white border-slate-300 dark:bg-slate-700 dark:border-slate-600'
+                                                    }`}>
+                                                    {selectedAmenities.includes(a) && <Check className="w-3 h-3 text-white" />}
+                                                </div>
+                                                {a}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             <div>
                                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">วาระการประชุม / รายละเอียดเพิ่มเติม</label>
@@ -427,23 +491,28 @@ const BookingModal: React.FC<BookingModalProps> = ({
                         </div>
 
                         <button
-                            disabled={loading}
-                            className="w-full bg-indigo-600 text-white rounded-2xl py-4 font-semibold hover:bg-indigo-700 disabled:opacity-60"
+                            disabled={loading || !!validate()}
+                            className="w-full bg-indigo-600 text-white rounded-2xl py-4 font-semibold hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
                         >
-                            {loading ? "กำลังบันทึก..." : "ยืนยันคำขอใช้ห้องประชุม"}
+                            {loading ? "กำลังบันทึก..." : hasConflict ? "ช่วงเวลานี้ถูกจองแล้ว" : "ยืนยันคำขอใช้ห้องประชุม"}
                         </button>
+                        {hasConflict && (
+                            <p className="text-center text-xs text-red-500 mt-2 font-medium animate-pulse">
+                                ! พบรายการจองอื่นในช่วงเวลาที่คุณเลือก
+                            </p>
+                        )}
                     </div>
                 </form>
             </div>
             {/* Success Modal Overlay */}
             {showSuccess && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center transform animate-in zoom-in-95 duration-200">
-                        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <Check className="w-10 h-10 text-green-600" />
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center transform animate-in zoom-in-95 duration-200 border dark:border-slate-800">
+                        <div className="w-20 h-20 bg-green-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <Check className="w-10 h-10 text-green-600 dark:text-emerald-400" />
                         </div>
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">ส่งคำขอจองแล้ว!</h3>
-                        <p className="text-gray-500 mb-8 leading-relaxed">
+                        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">ส่งคำขอจองแล้ว!</h3>
+                        <p className="text-gray-500 dark:text-slate-400 mb-8 leading-relaxed">
                             ระบบได้รับคำขอจองห้องของคุณเรียบร้อยแล้ว<br />
                             ขณะนี้อยู่ระหว่างรอการพิจารณาอนุมัติ
                         </p>
@@ -452,7 +521,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                                 setShowSuccess(false);
                                 onSuccess();
                             }}
-                            className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-green-200"
+                            className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-green-200 dark:shadow-none"
                         >
                             ตกลง
                         </button>

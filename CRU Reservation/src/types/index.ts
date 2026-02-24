@@ -16,7 +16,7 @@ export interface Room {
     name: string;
     type: string; // e.g., 'Conference', 'Classroom'
     capacity: number;
-    equipment: string[];
+    amenities: string[];
     status: RoomStatus;
     image?: string;
     images?: string[];
