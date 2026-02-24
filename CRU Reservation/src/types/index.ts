@@ -16,7 +16,8 @@ export interface Room {
     name: string;
     type: string; // e.g., 'Conference', 'Classroom'
     capacity: number;
-    amenities: string[];
+    amenities?: string[];
+    equipment?: string[];
     status: RoomStatus;
     image?: string;
     images?: string[];
@@ -35,12 +36,16 @@ export interface Booking {
     start_at: string;
     end_at: string;
 
+    startTime: string; // Compatibility with legacy code
+    endTime: string;   // Compatibility with legacy code
+
     setup_date?: string | null;
     setup_start?: string | null;
     setup_end?: string | null;
 
     purpose: string;
     status: string;
+    approvedBy?: string;
 
     created_at: string;
 }
