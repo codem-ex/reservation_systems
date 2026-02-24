@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
-import { format, addDays, startOfDay, addHours, isSameDay, differenceInMinutes } from "date-fns";
+import { format, addDays, startOfDay, addHours, differenceInMinutes } from "date-fns";
 import { th } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, MapPin, Loader2 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 
 type Reservation = {
@@ -10,6 +10,8 @@ type Reservation = {
     title: string;
     start_at: string;
     end_at: string;
+    setup_start_at?: string;
+    setup_end_at?: string;
     status: string;
 };
 
@@ -36,7 +38,7 @@ const RoomSchedule = () => {
                 const [roomsRes, resvRes] = await Promise.all([
                     supabase.from("rooms").select("id, name").eq("is_active", true).order("name"),
                     supabase.from("reservations")
-                        .select("id, room_id, title, start_at, end_at, status")
+                        .select("id, room_id, title, start_at, end_at, setup_start_at, setup_end_at, status")
                         .in("status", ["APPROVED", "PENDING"])
                 ]);
 
@@ -57,19 +59,24 @@ const RoomSchedule = () => {
 
     const filteredReservations = useMemo(() => {
         return reservations.filter(r => {
-            const resStart = startOfDay(new Date(r.start_at));
-            const resEnd = startOfDay(new Date(r.end_at));
+            // Use the full range of occupation (setup to end)
+            const trueStart = r.setup_start_at || r.start_at;
+            const trueEnd = r.end_at;
+
+            const resStart = startOfDay(new Date(trueStart));
+            const resEnd = startOfDay(new Date(trueEnd));
             const current = startOfDay(selectedDate);
             return current >= resStart && current <= resEnd;
         });
     }, [reservations, selectedDate]);
 
     const getResStyle = (r: Reservation) => {
-        const start = new Date(r.start_at);
+        // Occupation range
+        const start = new Date(r.setup_start_at || r.start_at);
         const end = new Date(r.end_at);
         const gridStart = addHours(startOfDay(selectedDate), START_HOUR);
 
-        // Calculate minutes since start of grid
+        // Calculate minutes since start of grid (07:00)
         const startMin = Math.max(0, differenceInMinutes(start, gridStart));
         const endMin = Math.min(TOTAL_HOURS * 60, differenceInMinutes(end, gridStart));
 
@@ -133,6 +140,57 @@ const RoomSchedule = () => {
                 </div>
             </div>
 
+            {/* Perfect Alignment Metadata Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-sm">
+                        <CalendarIcon className="w-4 h-4 text-primary-500 dark:text-primary-400" />
+                        <div className="flex gap-2">
+                            <span className="font-bold text-slate-400 min-w-[60px]">วันที่:</span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-200">{format(selectedDate, "d MMMM yyyy", { locale: th })}</span>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-sm">
+                        <Clock className="w-4 h-4 text-primary-500 dark:text-primary-400" />
+                        <div className="flex gap-2">
+                            <span className="font-bold text-slate-400 min-w-[60px]">เวลา:</span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-200">07:00 - 22:00 น.</span>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-sm">
+                        <MapPin className="w-4 h-4 text-primary-500 dark:text-primary-400" />
+                        <div className="flex gap-2">
+                            <span className="font-bold text-slate-400 min-w-[60px]">สถานที่:</span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-200">ห้องประชุมทั้งหมด</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-sm">
+                        <div className="w-3 h-3 rounded bg-emerald-500"></div>
+                        <div className="flex gap-2">
+                            <span className="font-bold text-slate-400 min-w-[60px]">สถานะ:</span>
+                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">อนุมัติเรียบร้อยแล้ว</span>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-sm">
+                        <div className="w-3 h-3 rounded bg-amber-400"></div>
+                        <div className="flex gap-2">
+                            <span className="font-bold text-slate-400 min-w-[60px]">สถานะ:</span>
+                            <span className="font-semibold text-amber-500">รอดำเนินการ / พิจารณา</span>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-sm opacity-60">
+                        <div className="w-3 h-3 border border-slate-200 dark:border-slate-700"></div>
+                        <div className="flex gap-2">
+                            <span className="font-bold text-slate-400 min-w-[60px]">สถานะ:</span>
+                            <span className="font-medium text-slate-600 dark:text-slate-400">ห้องว่าง / ยังไม่มีการจอง</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto">
                 <div className="min-w-[1200px]">
                     <table className="w-full border-collapse table-fixed">
@@ -189,11 +247,11 @@ const RoomSchedule = () => {
                                                                     ? 'bg-emerald-500 dark:bg-emerald-600 text-white border-emerald-400 shadow-emerald-200/50'
                                                                     : 'bg-amber-400 dark:bg-amber-500 text-amber-950 border-amber-300 shadow-amber-200/50'
                                                                 }`}
-                                                            title={`${res.title} (${res.status})\n${format(new Date(res.start_at), "HH:mm")} - ${format(new Date(res.end_at), "HH:mm")}`}
+                                                            title={`${res.title} (${res.status})\nจัดเตรียม: ${res.setup_start_at ? format(new Date(res.setup_start_at), "HH:mm") : "--"}\nใช้งาน: ${format(new Date(res.start_at), "HH:mm")} - ${format(new Date(res.end_at), "HH:mm")}`}
                                                         >
                                                             <div className="font-bold truncate text-xs mb-0.5">{res.title}</div>
                                                             <div className="opacity-90 font-semibold whitespace-nowrap">
-                                                                {format(new Date(res.start_at), "HH:mm")} - {format(new Date(res.end_at), "HH:mm")}
+                                                                {format(new Date(res.setup_start_at || res.start_at), "HH:mm")} - {format(new Date(res.end_at), "HH:mm")}
                                                             </div>
                                                         </div>
                                                     );
@@ -205,23 +263,6 @@ const RoomSchedule = () => {
                             })}
                         </tbody>
                     </table>
-                </div>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm inline-block">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    <div className="grid grid-cols-[12px_1fr] items-center gap-3 text-sm">
-                        <div className="w-3 h-3 rounded bg-emerald-500"></div>
-                        <span className="font-medium text-slate-600 dark:text-slate-400">อนุมัติแล้ว</span>
-                    </div>
-                    <div className="grid grid-cols-[12px_1fr] items-center gap-3 text-sm">
-                        <div className="w-3 h-3 rounded bg-amber-400"></div>
-                        <span className="font-medium text-slate-600 dark:text-slate-400">รออนุมัติ</span>
-                    </div>
-                    <div className="grid grid-cols-[12px_1fr] items-center gap-3 text-sm opacity-60">
-                        <div className="w-3 h-3 border border-slate-200 dark:border-slate-700"></div>
-                        <span className="font-medium text-slate-600 dark:text-slate-400">ห้องว่าง / ว่าง</span>
-                    </div>
                 </div>
             </div>
         </div>
