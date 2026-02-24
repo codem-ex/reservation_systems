@@ -163,31 +163,31 @@ export default function AdminEditRoom() {
         }
     };
 
-    if (loading || checkingAdmin || fetchingRoom) return <div className="p-10 text-center text-gray-500">Loading...</div>;
-    if (!isAdmin) return <div className="p-10 text-center text-red-500">Access Denied</div>;
+    if (loading || checkingAdmin || fetchingRoom) return <div className="p-10 text-center text-gray-500 dark:text-slate-400">Loading...</div>;
+    if (!isAdmin) return <div className="p-10 text-center text-red-500 dark:text-red-400">Access Denied</div>;
 
     return (
         <div className="max-w-5xl mx-auto py-10 px-4">
-            <button onClick={() => nav("/admin")} className="mb-6 flex items-center gap-2 text-gray-500 hover:text-gray-800 transition-colors">
+            <button onClick={() => nav("/admin")} className="mb-6 flex items-center gap-2 text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white transition-colors">
                 <ArrowLeft className="w-4 h-4" /> กลับหน้าจัดการ
             </button>
-            <h1 className="text-3xl font-bold mb-8">แก้ไขห้องประชุม: {name}</h1>
+            <h1 className="text-3xl font-bold mb-8 dark:text-white">แก้ไขห้องประชุม: {name}</h1>
 
             <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-8 border border-slate-200 dark:border-slate-800">
                 {(error || message) && (
-                    <div className={`p-4 rounded-xl mb-6 border ${error ? "bg-red-50 border-red-100 text-red-700" : "bg-emerald-50 border-emerald-100 text-emerald-700"}`}>
+                    <div className={`p-4 rounded-xl mb-6 border ${error ? "bg-red-50 border-red-100 text-red-700 dark:bg-red-900/20 dark:border-red-800/50 dark:text-red-400" : "bg-emerald-50 border-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800/50 dark:text-emerald-400"}`}>
                         {error || message}
                     </div>
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <div className="space-y-6">
-                        <label className="block text-sm font-semibold mb-2">รูปภาพห้องประชุม</label>
+                        <label className="block text-sm font-semibold mb-2 dark:text-white">รูปภาพห้องประชุม</label>
                         <div className="grid grid-cols-2 gap-2">
                             {existingImages.map((img, idx) => (
                                 <div key={img.path} className="relative group">
                                     <img src={img.url} className="w-full h-24 object-cover rounded-lg" />
-                                    <button onClick={() => removeExistingImageAt(idx)} className="absolute top-1 right-1 bg-white/90 p-1 rounded-md opacity-0 group-hover:opacity-100">
+                                    <button onClick={() => removeExistingImageAt(idx)} className="absolute top-1 right-1 bg-white/90 dark:bg-slate-800/90 p-1 rounded-md opacity-0 group-hover:opacity-100">
                                         <Trash2 className="w-3 h-3 text-red-600" />
                                     </button>
                                 </div>
@@ -195,13 +195,13 @@ export default function AdminEditRoom() {
                             {imagePreviews.map((src, idx) => (
                                 <div key={src} className="relative group">
                                     <img src={src} className="w-full h-24 object-cover rounded-lg border-2 border-indigo-500" />
-                                    <button onClick={() => removeNewImageAt(idx)} className="absolute top-1 right-1 bg-white/90 p-1 rounded-md opacity-0 group-hover:opacity-100">
+                                    <button onClick={() => removeNewImageAt(idx)} className="absolute top-1 right-1 bg-white/90 dark:bg-slate-800/90 p-1 rounded-md opacity-0 group-hover:opacity-100">
                                         <Trash2 className="w-3 h-3 text-red-600" />
                                     </button>
                                 </div>
                             ))}
                         </div>
-                        <button onClick={() => fileRef.current?.click()} className="w-full py-3 border-2 border-dashed border-slate-300 rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 text-sm text-gray-600">
+                        <button onClick={() => fileRef.current?.click()} className="w-full py-3 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 text-sm text-gray-600 dark:text-slate-400">
                             <UploadCloud className="w-4 h-4" /> เพิ่มรูปใหม่
                         </button>
                         <input ref={fileRef} type="file" multiple hidden accept="image/*" onChange={(e) => onPickFiles(e.target.files)} />
@@ -210,15 +210,15 @@ export default function AdminEditRoom() {
                     <div className="md:col-span-2 space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="col-span-2">
-                                <label className="text-sm font-medium">ชื่อห้อง</label>
+                                <label className="text-sm font-medium dark:text-slate-300">ชื่อห้อง</label>
                                 <input value={name} onChange={e => setName(e.target.value)} className="w-full p-3 border rounded-xl mt-1 dark:bg-slate-800 dark:border-slate-700" />
                             </div>
                             <div>
-                                <label className="text-sm font-medium">ความจุ (คน)</label>
+                                <label className="text-sm font-medium dark:text-slate-300">ความจุ (คน)</label>
                                 <input type="number" value={capacity} onChange={e => setCapacity(Number(e.target.value))} className="w-full p-3 border rounded-xl mt-1 dark:bg-slate-800 dark:border-slate-700" />
                             </div>
                             <div>
-                                <label className="text-sm font-medium">สถานะ</label>
+                                <label className="text-sm font-medium dark:text-slate-300">สถานะ</label>
                                 <select value={status} onChange={e => setStatus(e.target.value)} className="w-full p-3 border rounded-xl mt-1 dark:bg-slate-800 dark:border-slate-700">
                                     <option value="available">พร้อมใช้งาน</option>
                                     <option value="unavailable">ไม่พร้อมใช้งาน</option>
@@ -226,7 +226,7 @@ export default function AdminEditRoom() {
                                 </select>
                             </div>
                             <div className="col-span-2">
-                                <label className="text-sm font-medium">สถานที่</label>
+                                <label className="text-sm font-medium dark:text-slate-300">สถานที่</label>
                                 <input value={location} onChange={e => setLocation(e.target.value)} className="w-full p-3 border rounded-xl mt-1 dark:bg-slate-800 dark:border-slate-700" />
                             </div>
                         </div>
@@ -235,12 +235,30 @@ export default function AdminEditRoom() {
 
                 <div className="mt-8 space-y-6">
                     <div>
-                        <label className="text-sm font-medium">รายละเอียดห้อง</label>
+                        <label className="text-sm font-medium dark:text-slate-300">รายละเอียดห้อง</label>
                         <textarea rows={4} value={description} onChange={e => setDescription(e.target.value)} className="w-full p-3 border rounded-xl mt-1 dark:bg-slate-800 dark:border-slate-700" />
                     </div>
                     <div>
-                        <label className="text-sm font-medium">อุปกรณ์/สิ่งอำนวยความสะดวก (หนึ่งรายการต่อคนบรรทัด)</label>
-                        <textarea rows={4} value={amenitiesText} onChange={e => setAmenitiesText(e.target.value)} className="w-full p-3 border rounded-xl mt-1 dark:bg-slate-800 dark:border-slate-700" />
+                        <div className="flex justify-between items-center mb-1">
+                            <label className="text-sm font-medium dark:text-slate-300">อุปกรณ์/สิ่งอำนวยความสะดวก (หนึ่งรายการต่อคนบรรทัด)</label>
+                            <div className="flex gap-2">
+                                {["โปรเจคเตอร์", "ไมโครโฟนไร้สาย", "เครื่องเสียง", "ไวท์บอร์ด", "ปลั๊กไฟเสริม"].map(q => (
+                                    <button
+                                        key={q}
+                                        type="button"
+                                        onClick={() => {
+                                            if (!amenitiesText.includes(q)) {
+                                                setAmenitiesText(prev => prev ? `${prev}\n${q}` : q);
+                                            }
+                                        }}
+                                        className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded hover:bg-primary-50 dark:hover:bg-primary-900/20 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 transition-colors"
+                                    >
+                                        + {q}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <textarea rows={4} value={amenitiesText} onChange={e => setAmenitiesText(e.target.value)} className="w-full p-3 border rounded-xl mt-1 dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
                     </div>
                     <button onClick={onSubmit} disabled={busy} className="w-full bg-primary-600 text-white py-4 rounded-xl font-bold hover:bg-primary-700 transition-colors flex items-center justify-center gap-2">
                         {busy ? <Loader2 className="animate-spin" /> : <Save />} บันทึกการแก้ไขข้อมูล

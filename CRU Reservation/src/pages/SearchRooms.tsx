@@ -188,7 +188,6 @@ const SearchRooms = () => {
 
     const handleBookingSuccess = async () => {
         setSelectedRoom(null);
-        alert("Booking submitted successfully! Waiting for approval.");
         // ✅ ไม่ reload หน้า: refetch เพื่อให้ occupied logic อัปเดต
         await fetchRoomsAndReservations();
     };

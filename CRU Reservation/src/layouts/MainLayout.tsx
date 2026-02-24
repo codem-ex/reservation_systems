@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
-import { LayoutDashboard, Search, CalendarDays, LogOut, Moon, Sun, Settings } from "lucide-react";
+import { LayoutDashboard, Search, CalendarDays, LogOut, Moon, Sun, Settings, HelpCircle } from "lucide-react";
 import NotificationBell from "../components/NotificationBell";
+import AppParticles from "../components/AppParticles";
 
 import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabaseClient";
@@ -86,10 +87,13 @@ export default function MainLayout() {
 
     return (
         // ✅ ทำให้โครงนี้เป็น “หน้าจอเดียว” และกัน body scroll
-        <div className="h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden transition-colors duration-300">
-            <div className="flex h-full">
+        <div className="h-screen relative text-slate-900 dark:text-slate-100 overflow-hidden transition-colors duration-300">
+            {/* 3D Background Particles that adapt to Dark/Light mode */}
+            <AppParticles />
+
+            <div className="flex h-full relative z-10">
                 {/* Sidebar */}
-                <aside className="w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 hidden md:flex flex-col transition-colors">
+                <aside className="w-72 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border-r border-slate-200 dark:border-slate-800 hidden md:flex flex-col transition-colors">
                     {/* ✅ sticky ทำให้มัน “อยู่ในจอ” เวลา content ขวาเลื่อน */}
                     <div className="sticky top-0 flex flex-col h-screen">
                         {/* Brand */}
@@ -130,6 +134,11 @@ export default function MainLayout() {
                                 <Settings className="w-5 h-5 mr-3" />
                                 จัดการระบบ
                             </NavLink>
+
+                            <NavLink to="/help" className={navItemClass}>
+                                <HelpCircle className="w-5 h-5 mr-3" />
+                                คู่มือการใช้งาน
+                            </NavLink>
                         </nav>
 
                         {/* Spacer ให้ส่วนล่าง “ติดก้น sidebar” ตลอด */}
@@ -149,9 +158,9 @@ export default function MainLayout() {
                         </div>
 
                         {/* Profile + Logout (อยู่ล่างเสมอ) */}
-                        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-colors">
+                        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-transparent transition-colors">
                             <Link to="/profile">
-                                <div className="flex items-center p-3 bg-slate-50 dark:bg-slate-800 rounded-xl mb-3 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer border border-transparent dark:border-slate-700/50 shadow-sm">
+                                <div className="flex items-center p-3 bg-slate-50/50 dark:bg-slate-800/50 rounded-xl mb-3 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer border border-transparent dark:border-slate-700/50 shadow-sm">
                                     <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center text-primary-600 dark:text-primary-400 font-bold mr-3 overflow-hidden shadow-inner font-sans">
                                         {profile?.avatar_url ? (
                                             <img

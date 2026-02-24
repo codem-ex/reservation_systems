@@ -7,6 +7,11 @@
 */
 @variant dark (&:where(.dark, .dark *));
 
+/* 
+  🎨 Tailwind v4 Theme Configuration 
+  NOTE: IDEs may show "Unknown at-rule" warnings for @theme. 
+  This is standard Tailwind v4 syntax and safe to ignore.
+*/
 @theme {
   --color-primary-50: var(--color-indigo-50);
   --color-primary-100: var(--color-indigo-100);
@@ -139,8 +144,241 @@
     color: #94a3b8 !important;
     /* slate-400 */
   }
+
+  /* ===== Light-only background overrides ===== */
+  .dark .bg-gray-100,
+  .dark .bg-slate-100 {
+    background-color: #1e293b !important;
+    /* slate-800 */
+  }
+
+  .dark .bg-red-50 {
+    background-color: rgba(127, 29, 29, 0.2) !important;
+    /* red-900/20 */
+    color: #fca5a5 !important;
+    /* red-300 */
+  }
+
+  .dark .bg-emerald-50,
+  .dark .bg-green-50 {
+    background-color: rgba(6, 78, 59, 0.2) !important;
+    /* emerald-900/20 */
+    color: #6ee7b7 !important;
+    /* emerald-300 */
+  }
+
+  .dark .bg-yellow-50 {
+    background-color: rgba(113, 63, 18, 0.2) !important;
+    /* yellow-900/20 */
+    color: #fcd34d !important;
+    /* yellow-300 */
+  }
+
+  .dark .bg-indigo-50 {
+    background-color: rgba(49, 46, 129, 0.2) !important;
+    /* indigo-900/20 */
+    color: #a5b4fc !important;
+    /* indigo-300 */
+  }
+
+  .dark .bg-emerald-100 {
+    background-color: rgba(6, 78, 59, 0.3) !important;
+  }
+
+  .dark .bg-red-100 {
+    background-color: rgba(127, 29, 29, 0.3) !important;
+  }
+
+  .dark .text-red-700 {
+    color: #fca5a5 !important;
+    /* red-300 */
+  }
+
+  .dark .text-emerald-700,
+  .dark .text-green-700 {
+    color: #6ee7b7 !important;
+    /* emerald-300 */
+  }
+
+  .dark .text-yellow-800 {
+    color: #fcd34d !important;
+    /* yellow-300 */
+  }
+
+  .dark .text-indigo-700 {
+    color: #a5b4fc !important;
+    /* indigo-300 */
+  }
+
+  .dark .border-red-100 {
+    border-color: rgba(127, 29, 29, 0.4) !important;
+  }
+
+  .dark .border-emerald-100 {
+    border-color: rgba(6, 78, 59, 0.4) !important;
+  }
+
+  .dark .border-yellow-200 {
+    border-color: rgba(113, 63, 18, 0.4) !important;
+  }
+
+  .dark .border-indigo-100 {
+    border-color: rgba(49, 46, 129, 0.4) !important;
+  }
+
+  /* ===== Hover overrides ===== */
+  .dark .hover\:bg-gray-100:hover,
+  .dark .hover\:bg-slate-100:hover {
+    background-color: #334155 !important;
+    /* slate-700 */
+  }
+
+  .dark .hover\:bg-slate-200:hover,
+  .dark .hover\:bg-gray-200:hover {
+    background-color: #334155 !important;
+  }
+
+  .dark .hover\:bg-slate-50:hover,
+  .dark .hover\:bg-gray-50:hover {
+    background-color: #1e293b !important;
+  }
+
+  /* ===== react-date-range Calendar Dark Mode ===== */
+  .dark .rdrCalendarWrapper,
+  .dark .rdrDateRangeWrapper {
+    background-color: #0f172a !important;
+    /* slate-900 */
+    color: #f8fafc !important;
+  }
+
+  .dark .rdrMonthAndYearWrapper {
+    background-color: #0f172a !important;
+  }
+
+  .dark .rdrMonthAndYearPickers select {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+    border-color: #475569 !important;
+  }
+
+  .dark .rdrMonthPicker select,
+  .dark .rdrYearPicker select {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+  }
+
+  .dark .rdrMonth {
+    background-color: #0f172a !important;
+  }
+
+  /* Global Calendar Style - Stable */
+  .rdrCalendarWrapper {
+    background: transparent !important;
+  }
+
+  .rdrMonth {
+    padding: 0 0.25em 0.5em !important;
+  }
+
+  .rdrMonthAndYearWrapper {
+    height: 48px !important;
+    padding-top: 0 !important;
+  }
+
+  .dark .rdrWeekDay {
+    color: #94a3b8 !important;
+    /* slate-400 */
+  }
+
+  .dark .rdrDayNumber span {
+    color: #e2e8f0 !important;
+    /* slate-200 */
+  }
+
+  .dark .rdrDayPassive .rdrDayNumber span {
+    color: #475569 !important;
+    /* slate-600 */
+  }
+
+  .dark .rdrDayToday .rdrDayNumber span::after {
+    background: #818cf8 !important;
+    /* indigo-400 */
+  }
+
+  .dark .rdrDay:not(.rdrDayPassive) .rdrInRange~.rdrDayNumber span,
+  .dark .rdrDay:not(.rdrDayPassive) .rdrStartEdge~.rdrDayNumber span,
+  .dark .rdrDay:not(.rdrDayPassive) .rdrEndEdge~.rdrDayNumber span {
+    color: #ffffff !important;
+  }
+
+  .dark .rdrDayDisabled {
+    background-color: #0f172a !important;
+  }
+
+  .dark .rdrDayDisabled .rdrDayNumber span {
+    color: #334155 !important;
+    /* slate-700 */
+  }
+
+  .dark .rdrNextPrevButton {
+    background-color: #1e293b !important;
+  }
+
+  .dark .rdrNextPrevButton:hover {
+    background-color: #334155 !important;
+  }
+
+  .dark .rdrPprevButton i {
+    border-color: transparent #94a3b8 transparent transparent !important;
+  }
+
+  .dark .rdrNextButton i {
+    border-color: transparent transparent transparent #94a3b8 !important;
+  }
+
+  .dark .rdrDefinedRangesWrapper,
+  .dark .rdrStaticRanges,
+  .dark .rdrStaticRange {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+  }
+
+  .dark .rdrStaticRange span {
+    color: #e2e8f0 !important;
+  }
+
+  .dark .rdrInputRanges {
+    background-color: #0f172a !important;
+  }
+
+  .dark .rdrInputRange input {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+    border-color: #475569 !important;
+  }
+
+  .dark .rdrDateDisplayWrapper {
+    background-color: #1e293b !important;
+  }
+
+  .dark .rdrDateDisplay {
+    background-color: #0f172a !important;
+  }
+
+  .dark .rdrDateDisplayItem {
+    background-color: #1e293b !important;
+    border-color: #475569 !important;
+  }
+
+  .dark .rdrDateDisplayItem input {
+    color: #f8fafc !important;
+  }
 }
 
+/* 
+  🛠️ Tailwind Utilities Layer 
+  NOTE: IDEs may show warnings for @apply in CSS files.
+*/
 @layer utilities {
   .glass {
     @apply bg-white/70 backdrop-blur-md border border-white/20;

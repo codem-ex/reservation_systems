@@ -13,6 +13,7 @@ import AdminAddRoom from "./pages/AdminAddRoom";
 import AdminEditRoom from "./pages/AdminEditRoom";
 import RoomSchedule from "./pages/RoomSchedule";
 import Notifications from "./pages/Notifications";
+import UserGuide from "./pages/UserGuide";
 
 import { getCurrentUser } from "./services/storage";
 import { useAuth } from "./lib/auth";
@@ -153,6 +154,7 @@ function App() {
           <Route path="schedule" element={<RoomSchedule />} />
           <Route path="bookings" element={<MyBookings />} />
           <Route path="notifications" element={<Notifications />} />
+          <Route path="help" element={<UserGuide />} />
           <Route path="admin" element={<AdminDashboard />} />
 
           {/* ✅ New: Admin add room */}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, X, Check, Clock } from "lucide-react";
+import { Bell, X, Check, Clock, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { format } from "date-fns";
@@ -58,10 +58,42 @@ const NotificationBell = ({ userId }: { userId: string }) => {
         fetchNotifications();
     };
 
+    const markAllAsRead = async () => {
+        if (!userId) return;
+        const unread = notifications.filter(n => !n.is_read);
+        if (unread.length === 0) return;
+        await supabase
+            .from("notifications")
+            .update({ is_read: true })
+            .eq("user_id", userId)
+            .eq("is_read", false);
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    };
+
+    const toggleDropdown = () => {
+        const willOpen = !showDropdown;
+        setShowDropdown(willOpen);
+        if (willOpen && unreadCount > 0) {
+            markAllAsRead();
+        }
+    };
+
+    const handleNotificationClick = (n: Notification) => {
+        markAsRead(n.id);
+        setShowDropdown(false);
+
+        // Simple routing logic based on notification type/content
+        if (n.title.includes("จองห้องใหม่") || n.type === "new_reservation") {
+            navigate("/admin");
+        } else if (n.title.includes("อนุมัติ") || n.title.includes("ปฏิเสธ")) {
+            navigate("/bookings");
+        }
+    };
+
     return (
         <div className="relative">
             <button
-                onClick={() => setShowDropdown(!showDropdown)}
+                onClick={toggleDropdown}
                 className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors relative"
             >
                 <Bell className="w-5 h-5" />
@@ -90,12 +122,22 @@ const NotificationBell = ({ userId }: { userId: string }) => {
                                     <div
                                         key={n.id}
                                         className={`p-4 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer ${!n.is_read ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}`}
-                                        onClick={() => markAsRead(n.id)}
+                                        onClick={() => handleNotificationClick(n)}
                                     >
                                         <div className="flex gap-3">
                                             <div className={`mt-1 w-8 h-8 rounded-full flex items-center justify-center
-                                                ${n.title.includes('อนุมัติ') ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'}`}>
-                                                {n.title.includes('อนุมัติ') ? <Check className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                                                ${n.title.includes('อนุมัติ')
+                                                    ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
+                                                    : n.title.includes('ปฏิเสธ')
+                                                        ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                                                        : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'}`}>
+                                                {n.title.includes('อนุมัติ') ? (
+                                                    <Check className="w-4 h-4" />
+                                                ) : n.title.includes('ปฏิเสธ') ? (
+                                                    <AlertCircle className="w-4 h-4" />
+                                                ) : (
+                                                    <Clock className="w-4 h-4" />
+                                                )}
                                             </div>
                                             <div className="flex-1">
                                                 <div className="text-xs font-bold mb-1 text-slate-900 dark:text-white">{n.title}</div>

@@ -301,7 +301,7 @@ export default function AdminAddRoom() {
 
     if (loading || checkingAdmin) {
         return (
-            <div className="min-h-[70vh] flex items-center justify-center text-gray-500">
+            <div className="min-h-[70vh] flex items-center justify-center text-gray-500 dark:text-slate-400">
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 Loading...
             </div>
@@ -310,7 +310,7 @@ export default function AdminAddRoom() {
 
     if (!user) {
         return (
-            <div className="min-h-[70vh] flex items-center justify-center text-gray-700">
+            <div className="min-h-[70vh] flex items-center justify-center text-gray-700 dark:text-slate-400">
                 ยังไม่ได้เข้าสู่ระบบ
             </div>
         );
@@ -319,13 +319,13 @@ export default function AdminAddRoom() {
     if (!isAdmin) {
         return (
             <div className="min-h-[70vh] flex items-center justify-center px-4">
-                <div className="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-100 p-6">
+                <div className="w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 p-6">
                     <div className="flex items-center gap-3 text-red-700">
                         <ShieldAlert className="w-5 h-5" />
                         <div className="font-semibold">หน้านี้สำหรับแอดมินเท่านั้น</div>
                     </div>
-                    <div className="text-sm text-gray-500 mt-2">
-                        ให้ตั้งค่า <code className="px-1 bg-gray-100 rounded">profiles.is_admin = true</code>
+                    <div className="text-sm text-gray-500 dark:text-slate-400 mt-2">
+                        ให้ตั้งค่า <code className="px-1 bg-gray-100 dark:bg-slate-800 rounded">profiles.is_admin = true</code>
                     </div>
                 </div>
             </div>
@@ -336,18 +336,18 @@ export default function AdminAddRoom() {
         <div className="min-h-[70vh] flex items-start justify-center py-10 px-4">
             <div className="w-full max-w-5xl">
                 <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">เพิ่มห้องประชุม</h1>
-                    <p className="text-gray-500 mt-2">เพิ่มข้อมูลห้องประชุม (เฉพาะแอดมิน)</p>
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">เพิ่มห้องประชุม</h1>
+                    <p className="text-gray-500 dark:text-slate-400 mt-2">เพิ่มข้อมูลห้องประชุม (เฉพาะแอดมิน)</p>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 p-6">
                     {(error || message) && (
                         <div
                             className={[
                                 "rounded-lg border p-3 text-sm mb-6",
                                 error
-                                    ? "bg-red-50 border-red-100 text-red-700"
-                                    : "bg-emerald-50 border-emerald-100 text-emerald-700",
+                                    ? "bg-red-50 border-red-100 text-red-700 dark:bg-red-900/20 dark:border-red-800/50 dark:text-red-400"
+                                    : "bg-emerald-50 border-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800/50 dark:text-emerald-400",
                             ].join(" ")}
                         >
                             {error || message}
@@ -357,8 +357,8 @@ export default function AdminAddRoom() {
                     <div className="flex flex-col md:flex-row gap-8">
                         {/* Images */}
                         <div className="w-full md:w-96">
-                            <div className="rounded-2xl border border-gray-200 bg-slate-50 p-4">
-                                <div className="flex items-center gap-2 text-gray-700 font-semibold">
+                            <div className="rounded-2xl border border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4">
+                                <div className="flex items-center gap-2 text-gray-700 dark:text-slate-300 font-semibold">
                                     <ImageIcon className="w-4 h-4" />
                                     รูปห้องประชุม (หลายรูป)
                                 </div>
@@ -367,7 +367,7 @@ export default function AdminAddRoom() {
                                     type="button"
                                     onClick={() => fileRef.current?.click()}
                                     disabled={busy}
-                                    className="mt-4 w-full rounded-lg border border-gray-200 bg-white px-4 py-3 font-semibold text-gray-800 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    className="mt-4 w-full rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 font-semibold text-gray-800 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
                                     <UploadCloud className="w-4 h-4" />
                                     เลือกรูป (เลือกได้หลายไฟล์)
@@ -382,21 +382,21 @@ export default function AdminAddRoom() {
                                     onChange={(e) => onPickFiles(e.target.files)}
                                 />
 
-                                <div className="mt-3 text-xs text-gray-500">PNG/JPG/WEBP • ≤ 5MB ต่อรูป</div>
+                                <div className="mt-3 text-xs text-gray-500 dark:text-slate-500">PNG/JPG/WEBP • ≤ 5MB ต่อรูป</div>
 
                                 <div className="mt-4 grid grid-cols-2 gap-3">
                                     {imagePreviews.length === 0 ? (
-                                        <div className="col-span-2 text-sm text-gray-500 bg-white border border-gray-200 rounded-xl p-4 text-center">
+                                        <div className="col-span-2 text-sm text-gray-500 dark:text-slate-400 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4 text-center">
                                             ยังไม่ได้เลือกรูป
                                         </div>
                                     ) : (
                                         imagePreviews.map((src, idx) => (
-                                            <div key={src} className="relative rounded-xl overflow-hidden border border-gray-200 bg-white">
+                                            <div key={src} className="relative rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                                                 <img src={src} alt={`preview-${idx}`} className="w-full h-28 object-cover" />
                                                 <button
                                                     type="button"
                                                     onClick={() => removeImageAt(idx)}
-                                                    className="absolute top-2 right-2 bg-white/90 border border-gray-200 rounded-lg p-1 hover:bg-white"
+                                                    className="absolute top-2 right-2 bg-white/90 dark:bg-slate-800/90 border border-gray-200 dark:border-slate-700 rounded-lg p-1 hover:bg-white dark:hover:bg-slate-700"
                                                     title="ลบรูปนี้"
                                                 >
                                                     <Trash2 className="w-4 h-4 text-gray-700" />
@@ -412,12 +412,12 @@ export default function AdminAddRoom() {
                         <div className="flex-1">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อห้อง</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">ชื่อห้อง</label>
                                     <input
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
                                         placeholder="เช่น ห้องประชุม A"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors dark:bg-slate-800 dark:text-white"
                                     />
                                 </div>
 
@@ -427,7 +427,7 @@ export default function AdminAddRoom() {
                                         value={location}
                                         onChange={(e) => setLocation(e.target.value)}
                                         placeholder="เช่น อาคาร 2 ชั้น 3"
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors dark:bg-slate-800 dark:text-white"
                                     />
                                 </div>
 
@@ -438,7 +438,7 @@ export default function AdminAddRoom() {
                                         value={capacity}
                                         onChange={(e) => setCapacity(Number(e.target.value))}
                                         min={1}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors dark:bg-slate-800 dark:text-white"
                                     />
                                 </div>
 
@@ -447,7 +447,7 @@ export default function AdminAddRoom() {
                                     <select
                                         value={status}
                                         onChange={(e) => setStatus(e.target.value)}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                                     >
                                         <option value="available">available</option>
                                         <option value="unavailable">unavailable</option>
@@ -457,7 +457,7 @@ export default function AdminAddRoom() {
 
                                 {/* ✅ description = รายละเอียดห้อง */}
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                                         รายละเอียดห้อง (ความเป็นมา/เหมาะกับอะไร)
                                     </label>
                                     <textarea
@@ -465,24 +465,42 @@ export default function AdminAddRoom() {
                                         onChange={(e) => setDescription(e.target.value)}
                                         placeholder="อธิบายห้องนี้คืออะไร ความเป็นมาอย่างไร เหมาะกับการใช้งานแบบไหน เช่น ประชุมคณะ, อบรม, สัมมนา..."
                                         rows={4}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors dark:bg-slate-800 dark:text-white"
                                     />
                                 </div>
 
                                 {/* ✅ amenities jsonb */}
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Amenities / อุปกรณ์ในห้อง (เก็บลง amenities jsonb)
-                                    </label>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+                                            Amenities / อุปกรณ์ในห้อง (เก็บลง amenities jsonb)
+                                        </label>
+                                        <div className="flex gap-2">
+                                            {["โปรเจคเตอร์", "ไมโครโฟนไร้สาย", "เครื่องเสียง", "ไวท์บอร์ด", "ปลั๊กไฟเสริม"].map(q => (
+                                                <button
+                                                    key={q}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (!amenitiesText.includes(q)) {
+                                                            setAmenitiesText(prev => prev ? `${prev}\n${q}` : q);
+                                                        }
+                                                    }}
+                                                    className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded hover:bg-primary-50 dark:hover:bg-primary-900/20 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 transition-colors"
+                                                >
+                                                    + {q}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
                                     <textarea
                                         value={amenitiesText}
                                         onChange={(e) => setAmenitiesText(e.target.value)}
                                         placeholder={`พิมพ์รายการอุปกรณ์ เช่น\n- โปรเจคเตอร์\n- ไมโครโฟน\n- ลำโพง\n- กระดานไวท์บอร์ด\n\nคั่นด้วยคอมม่า หรือขึ้นบรรทัดก็ได้`}
                                         rows={4}
-                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                                        className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors dark:bg-slate-800 dark:text-white"
                                     />
-                                    <div className="mt-2 text-xs text-gray-500">
-                                        ระบบจะบันทึกเป็น array เช่น <code className="px-1 bg-gray-100 rounded">["โปรเจคเตอร์","ไมโครโฟน"]</code>
+                                    <div className="mt-2 text-xs text-gray-500 dark:text-slate-500">
+                                        ระบบจะบันทึกเป็น array เช่น <code className="px-1 bg-gray-100 dark:bg-slate-800 rounded">["โปรเจคเตอร์","ไมโครโฟน"]</code>
                                     </div>
                                 </div>
                             </div>
@@ -498,7 +516,7 @@ export default function AdminAddRoom() {
                                     บันทึกห้อง
                                 </button>
 
-                                <span className="text-sm text-gray-500">Draft autosave เปิดอยู่</span>
+                                <span className="text-sm text-gray-500 dark:text-slate-500">Draft autosave เปิดอยู่</span>
                             </div>
                         </div>
                     </div>
