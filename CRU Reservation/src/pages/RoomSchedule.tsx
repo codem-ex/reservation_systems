@@ -56,7 +56,12 @@ const RoomSchedule = () => {
     }, []);
 
     const filteredReservations = useMemo(() => {
-        return reservations.filter(r => isSameDay(new Date(r.start_at), selectedDate));
+        return reservations.filter(r => {
+            const resStart = startOfDay(new Date(r.start_at));
+            const resEnd = startOfDay(new Date(r.end_at));
+            const current = startOfDay(selectedDate);
+            return current >= resStart && current <= resEnd;
+        });
     }, [reservations, selectedDate]);
 
     const getResStyle = (r: Reservation) => {

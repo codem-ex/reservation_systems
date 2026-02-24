@@ -5,6 +5,7 @@ import { format } from "date-fns";
 
 import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabaseClient";
+import { createGoogleCalendarEvent } from "../lib/calendarSync";
 
 /* ===============================
    Types (ตาม schema ที่ส่งมา)
@@ -363,6 +364,24 @@ const AdminDashboard = () => {
                 .single();
 
             const isFullyApproved = updatedRes?.status === "APPROVED";
+            console.log(`[Debug Sync] Reservation ID: ${r.id}, Status: ${updatedRes?.status}, IsFullyApproved: ${isFullyApproved}`);
+
+            // ✅ If fully approved, sync to Google Calendar (Option B)
+            if (isFullyApproved) {
+                console.log("[Debug Sync] Attempting to sync to Google Calendar...");
+                try {
+                    const syncResult = await createGoogleCalendarEvent({
+                        summary: `[จองห้อง] ${row.room?.name || "ห้องประชุม"} - ${r.title}`,
+                        location: row.room?.location || "",
+                        description: `ผู้จอง: ${row.requester?.display_name || "ไม่ระบุชื่อ"}\nวัตถุประสงค์: ${r.purpose}\nสถานะ: อนุมัติแล้วผ่านระบบ`,
+                        startISO: r.start_at,
+                        endISO: r.end_at,
+                    });
+                    console.log("[Debug Sync] Google Calendar Sync Success:", syncResult);
+                } catch (err) {
+                    console.error("[Debug Sync] Google Calendar Sync Error:", err);
+                }
+            }
 
             await supabase.from("notifications").insert({
                 user_id: requesterId,
