@@ -27,7 +27,7 @@ function AdaptiveParticles() {
         return pos;
     }, []);
 
-    useFrame((state, delta) => {
+    useFrame((_, delta) => {
         if (pointsRef.current) {
             // เคลื่อนไหวลอยขึ้นช้าๆ เหมือนฝุ่นในแสงแดด
             pointsRef.current.position.y += delta * 0.05;

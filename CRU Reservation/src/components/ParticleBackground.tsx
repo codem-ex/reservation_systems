@@ -45,7 +45,7 @@ function Nebula() {
         return () => window.removeEventListener('mousemove', handleMouseMove);
     }, []);
 
-    useFrame((state, delta) => {
+    useFrame((_, delta) => {
         if (pointsRef.current) {
             // หมุนช้าๆ ให้ดูเหมือนอวกาศโอบล้อมตัวเรา
             pointsRef.current.rotation.y += delta * 0.03;
