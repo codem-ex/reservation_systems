@@ -267,7 +267,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 setup_start_at: buildISO(setupStartDate, setupStart),
                 setup_end_at: buildISO(setupEndDate, setupEnd, true),
 
-                // ✅ ยุบเหลือขั้นตอนเดียว (แอดมินอนุมัติ)
+                // ✅ เริ่มต้นที่ขั้นตอนที่ 1 (จากทั้งหมด 2 ขั้นตอน)
                 status: "PENDING",
                 current_stage: 1
             };
@@ -315,7 +315,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-300">
-            <div className="w-full max-w-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20 dark:border-slate-800/50 flex flex-col max-h-[95vh] sm:max-h-[90vh] animate-in zoom-in-95 duration-300">
+            <div className="w-full max-w-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20 dark:border-slate-800/50 flex flex-col max-h-[95dvh] sm:max-h-[90vh] animate-in zoom-in-95 duration-300">
                 <div className="bg-slate-900 dark:bg-black px-5 py-5 relative border-b border-white/5">
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
@@ -444,7 +444,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
                     </div>
 
-                    <div className="sticky bottom-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl pt-2 pb-1 border-t dark:border-slate-800 mt-2">
+                    <div className="sticky bottom-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:pb-1 border-t dark:border-slate-800 mt-2">
                         <button
                             type="submit"
                             disabled={loading || !!validate()}

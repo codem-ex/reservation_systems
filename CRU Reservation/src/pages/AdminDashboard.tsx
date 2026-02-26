@@ -65,15 +65,12 @@ type ChainStep = {
     is_active: boolean;
 };
 
-type ApprovalLog = {
+type AuditLog = {
     id: string;
-    reservation_id: string;
-    chain_id: string | null;
-    stage_no: number;
-    approver_user_id: string;
-    decision: "APPROVED" | "REJECTED" | string;
-    decision_note: string | null;
-    decided_at: string | null;
+    reservation_id: string | null;
+    user_id: string;
+    action_type: 'CREATE' | 'APPROVE' | 'REJECT' | 'CANCEL' | string;
+    details: string | null;
     created_at: string;
 };
 
@@ -96,8 +93,10 @@ const AdminDashboard = () => {
     const [profiles, setProfiles] = useState<ProfileRow[]>([]);
     const [steps, setSteps] = useState<ChainStep[]>([]);
     const [errorMsg, setErrorMsg] = useState("");
-    const [activeTab, setActiveTab] = useState<"reservations" | "rooms" | "reports" | "users">("reservations");
+    const [activeTab, setActiveTab] = useState<"reservations" | "rooms" | "logs" | "users">("reservations");
     const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+    const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
 
 
     // reject modal
@@ -109,7 +108,7 @@ const AdminDashboard = () => {
     const [timelineOpen, setTimelineOpen] = useState(false);
     const [timelineTitle, setTimelineTitle] = useState("");
     const [timelineLoading, setTimelineLoading] = useState(false);
-    const [timelineLogs, setTimelineLogs] = useState<ApprovalLog[]>([]);
+    const [timelineLogs, setTimelineLogs] = useState<{ id: string; stage_no: number; approver_user_id: string; decision: string; decision_note: string | null; decided_at: string }[]>([]);
 
     // Quick Edit Amenities
     const [amenityEditOpen, setAmenityEditOpen] = useState(false);
@@ -210,12 +209,39 @@ const AdminDashboard = () => {
             .channel('admin_dashboard_realtime')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => loadAll())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'reservation_approvals' }, () => loadAll())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => {
+                if (activeTab === 'logs') loadLogs();
+            })
             .subscribe();
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [supabaseUser?.id]);
+    }, [supabaseUser?.id, activeTab]);
+
+    const loadLogs = async () => {
+        if (!isAdmin) return;
+        setLoadingLogs(true);
+        try {
+            const { data, error } = await supabase
+                .from('audit_logs')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(100);
+            if (error) throw error;
+            setAuditLogs(data || []);
+        } catch (e: any) {
+            console.error("Error loading logs:", e.message);
+        } finally {
+            setLoadingLogs(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'logs' && isAdmin) {
+            loadLogs();
+        }
+    }, [activeTab, isAdmin]);
 
     /* ===============================
        Helpers
@@ -517,15 +543,13 @@ const AdminDashboard = () => {
         setTimelineLogs([]);
 
         try {
-            const { data, error } = await supabase
+            const { data } = await supabase
                 .from("reservation_approvals")
-                .select("id,reservation_id,chain_id,stage_no,approver_user_id,decision,decision_note,decided_at,created_at")
+                .select("id, stage_no, approver_user_id, decision, decision_note, decided_at")
                 .eq("reservation_id", row.r.id)
-                .order("created_at", { ascending: true });
+                .order("stage_no", { ascending: true });
 
-            if (error) throw error;
-
-            setTimelineLogs((data || []) as ApprovalLog[]);
+            setTimelineLogs((data as any[]) || []);
         } catch (e: any) {
             alert(e.message);
         } finally {
@@ -679,10 +703,10 @@ const AdminDashboard = () => {
                         รายชื่อห้องประชุม
                     </button>
                     <button
-                        onClick={() => setActiveTab("reports")}
-                        className={`px-6 py-3 font-semibold transition-colors ${activeTab === 'reports' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
+                        onClick={() => setActiveTab("logs")}
+                        className={`px-6 py-3 font-semibold transition-colors ${activeTab === 'logs' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
                     >
-                        รายงานและสถิติ
+                        ระบบ Logs
                     </button>
                     <button
                         onClick={() => setActiveTab("users")}
@@ -883,43 +907,62 @@ const AdminDashboard = () => {
                 </section>
             )}
 
-            {activeTab === "reports" && isAdmin && (
-                <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                            <div className="text-sm text-gray-500 mb-1">การจองทั้งหมด</div>
-                            <div className="text-3xl font-bold">{reservations.length} รายการ</div>
+            {activeTab === "logs" && isAdmin && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+                        <div className="p-6 border-b dark:border-slate-800 flex justify-between items-center">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Audit Logs (ประวัติการทำงานของระบบ)</h3>
+                            <button
+                                onClick={loadLogs}
+                                className="text-xs font-bold text-primary-600 hover:text-primary-700"
+                            >
+                                รีเฟรช
+                            </button>
                         </div>
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                            <div className="text-sm text-emerald-500 mb-1">อนุมัติแล้ว</div>
-                            <div className="text-3xl font-bold">{reservations.filter(r => r.status === 'APPROVED').length} รายการ</div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50 dark:bg-slate-800/50 border-b dark:border-slate-800">
+                                    <tr>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">วัน-เวลา</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ผู้ดำเนินการ</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ประเภท</th>
+                                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">รายละเอียด</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                    {loadingLogs ? (
+                                        <tr><td colSpan={4} className="px-6 py-10 text-center text-slate-400 italic">กำลังโหลดข้อมูล...</td></tr>
+                                    ) : auditLogs.length === 0 ? (
+                                        <tr><td colSpan={4} className="px-6 py-10 text-center text-slate-400 italic">ไม่พบประวัติการทำงาน</td></tr>
+                                    ) : (
+                                        auditLogs.map(log => (
+                                            <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                                                <td className="px-6 py-4 text-xs text-slate-500 whitespace-nowrap">
+                                                    {format(new Date(log.created_at), "dd/MM/yyyy HH:mm:ss")}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                                        {profileById.get(log.user_id)?.display_name || 'System / Unidentified'}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${log.action_type === 'CREATE' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                                        log.action_type === 'APPROVE' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                                            log.action_type === 'REJECT' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                                                'bg-slate-100 text-slate-600'
+                                                        }`}>
+                                                        {log.action_type}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-xs text-slate-600 dark:text-slate-400">
+                                                    {log.details}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                            <div className="text-sm text-amber-500 mb-1">รอการอนุมัติ</div>
-                            <div className="text-3xl font-bold">{reservations.filter(r => r.status === 'PENDING').length} รายการ</div>
-                        </div>
-                    </div>
-
-                    <div className="bg-indigo-600 dark:bg-indigo-700 p-8 rounded-3xl text-white shadow-lg overflow-hidden relative">
-                        <div className="relative z-10">
-                            <h3 className="text-xl font-bold mb-2">ออกรายงานสรุปผล</h3>
-                            <p className="text-indigo-100 text-sm mb-6 max-w-md">ดาวน์โหลดข้อมูลการจองห้องประชุมทั้งหมดในรูปแบบ PDF หรือ Excel เพื่อนำไปใช้งานด้านธุรการ</p>
-                            <div className="flex gap-4">
-                                <button
-                                    className="px-6 py-3 bg-white text-indigo-700 rounded-xl font-bold hover:bg-slate-50 transition-colors shadow-sm"
-                                    onClick={() => alert('ฟีเจอร์นี้ต้องใช้ไลบรารี jsPDF / ExcelJS')}
-                                >
-                                    ดาวน์โหลด PDF
-                                </button>
-                                <button
-                                    className="px-6 py-3 bg-indigo-500 text-white rounded-xl font-bold hover:bg-indigo-400 transition-colors border border-indigo-400"
-                                    onClick={() => alert('ฟีเจอร์นี้ต้องใช้ไลบรารี jsPDF / ExcelJS')}
-                                >
-                                    ดาวน์โหลด Excel
-                                </button>
-                            </div>
-                        </div>
-                        <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-indigo-500/30 rounded-full blur-3xl"></div>
                     </div>
                 </div>
             )}
@@ -974,7 +1017,7 @@ const AdminDashboard = () => {
                 </section>
             )}
 
-            {activeTab === "reports" && isAdmin && (
+            {activeTab === "logs" && isAdmin && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     {/* Stat Cards */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">

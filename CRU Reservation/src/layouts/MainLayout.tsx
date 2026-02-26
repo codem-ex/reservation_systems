@@ -88,7 +88,7 @@ export default function MainLayout() {
 
     return (
         // ✅ Keep original overflow-hidden and h-screen
-        <div className="h-screen relative text-slate-900 dark:text-slate-100 overflow-hidden transition-colors duration-300">
+        <div className="h-screen supports-[height:100dvh]:h-[100dvh] relative text-slate-900 dark:text-slate-100 overflow-hidden transition-colors duration-300 flex flex-col">
             {/* 3D Background Particles */}
             <AppParticles />
 
@@ -108,7 +108,7 @@ export default function MainLayout() {
                 </div>
             </div>
 
-            <div className="flex h-full relative z-10">
+            <div className="flex flex-1 min-h-0 relative">
                 {/* Mobile Drawer Backdrop */}
                 {isMobileMenuOpen && (
                     <div
@@ -125,8 +125,8 @@ export default function MainLayout() {
                     ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
                 `}>
                     <div className="flex flex-col h-full w-full">
-                        {/* Brand (Desktop View) */}
-                        <div className="p-6 flex items-center justify-between">
+                        {/* Brand (Mobile Header with Safe Area) */}
+                        <div className="p-6 pt-[calc(1.5rem+env(safe-area-inset-top))] flex items-start justify-between">
                             <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="block hover:opacity-80 transition-opacity group">
                                 <div className="text-2xl font-extrabold text-primary-700 leading-tight group-hover:text-primary-600 transition-colors">
                                     ระบบจองห้อง
@@ -196,8 +196,8 @@ export default function MainLayout() {
                             </div>
                         </div>
 
-                        {/* Profile + Logout */}
-                        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-transparent transition-colors">
+                        {/* Profile + Logout (Footer with Safe Area) */}
+                        <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4 border-t border-slate-200 dark:border-slate-800 bg-transparent transition-colors">
                             <Link to="/profile" onClick={() => setIsMobileMenuOpen(false)}>
                                 <div className="flex items-center p-3 bg-slate-50/50 dark:bg-slate-800/50 rounded-xl mb-3 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer border border-transparent dark:border-slate-700/50 shadow-sm">
                                     <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center text-primary-600 dark:text-primary-400 font-bold mr-3 overflow-hidden shadow-inner font-sans">
@@ -212,7 +212,6 @@ export default function MainLayout() {
                                             (displayName?.charAt(0) || "U").toUpperCase()
                                         )}
                                     </div>
-
                                     <div className="min-w-0">
                                         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                                             {displayName}
@@ -223,7 +222,6 @@ export default function MainLayout() {
                                     </div>
                                 </div>
                             </Link>
-
                             <button
                                 className="flex items-center justify-center w-full px-4 py-2 text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
                                 onClick={async () => {
@@ -240,8 +238,8 @@ export default function MainLayout() {
                 </aside>
 
                 {/* Content */}
-                <main className="flex-1 overflow-y-auto">
-                    <div className="p-4 md:p-8">
+                <main className="flex-1 overflow-y-auto overscroll-none">
+                    <div className="p-4 md:p-8 pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-8">
                         <Outlet />
                     </div>
                 </main>
