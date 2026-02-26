@@ -141,62 +141,69 @@ const RoomSchedule = () => {
             </div>
 
             {/* Perfect Alignment Metadata Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-sm">
-                        <CalendarIcon className="w-4 h-4 text-primary-500 dark:text-primary-400" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4">
+                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-[11px]">
+                        <CalendarIcon className="w-4 h-4 text-primary-500" />
                         <div className="flex gap-2">
-                            <span className="font-bold text-slate-400 min-w-[60px]">วันที่:</span>
-                            <span className="font-semibold text-slate-700 dark:text-slate-200">{format(selectedDate, "d MMMM yyyy", { locale: th })}</span>
+                            <span className="font-black text-slate-400 uppercase tracking-widest min-w-[60px]">วันที่:</span>
+                            <span className="font-bold text-slate-700 dark:text-slate-200">{format(selectedDate, "d MMMM yyyy", { locale: th })}</span>
                         </div>
                     </div>
-                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-sm">
-                        <Clock className="w-4 h-4 text-primary-500 dark:text-primary-400" />
+                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-[11px]">
+                        <Clock className="w-4 h-4 text-primary-500" />
                         <div className="flex gap-2">
-                            <span className="font-bold text-slate-400 min-w-[60px]">เวลา:</span>
-                            <span className="font-semibold text-slate-700 dark:text-slate-200">07:00 - 22:00 น.</span>
+                            <span className="font-black text-slate-400 uppercase tracking-widest min-w-[60px]">เวลา:</span>
+                            <span className="font-bold text-slate-700 dark:text-slate-200">07:00 - 22:00 น.</span>
                         </div>
                     </div>
-                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-sm">
-                        <MapPin className="w-4 h-4 text-primary-500 dark:text-primary-400" />
+                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-[11px]">
+                        <MapPin className="w-4 h-4 text-primary-500" />
                         <div className="flex gap-2">
-                            <span className="font-bold text-slate-400 min-w-[60px]">สถานที่:</span>
-                            <span className="font-semibold text-slate-700 dark:text-slate-200">ห้องประชุมทั้งหมด</span>
+                            <span className="font-black text-slate-400 uppercase tracking-widest min-w-[60px]">สถานที่:</span>
+                            <span className="font-bold text-slate-700 dark:text-slate-200 truncate">ห้องประชุมทั้งหมด</span>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-sm">
-                        <div className="w-3 h-3 rounded bg-emerald-500"></div>
+                <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4">
+                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-[11px]">
+                        <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-200 ring-2 ring-emerald-100 dark:ring-emerald-900/20"></div>
                         <div className="flex gap-2">
-                            <span className="font-bold text-slate-400 min-w-[60px]">สถานะ:</span>
-                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">อนุมัติเรียบร้อยแล้ว</span>
+                            <span className="font-black text-slate-400 uppercase tracking-widest min-w-[60px]">สถานะ:</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">อนุมัติเรียบร้อยแล้ว</span>
                         </div>
                     </div>
-                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-sm">
-                        <div className="w-3 h-3 rounded bg-amber-400"></div>
+                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-[11px]">
+                        <div className="w-3.5 h-3.5 rounded-full bg-amber-400 shadow-sm shadow-amber-200 ring-2 ring-amber-100 dark:ring-amber-900/20"></div>
                         <div className="flex gap-2">
-                            <span className="font-bold text-slate-400 min-w-[60px]">สถานะ:</span>
-                            <span className="font-semibold text-amber-500">รอดำเนินการ / พิจารณา</span>
+                            <span className="font-black text-slate-400 uppercase tracking-widest min-w-[60px]">สถานะ:</span>
+                            <span className="font-bold text-amber-500">รอดำเนินการ / พิจารณา</span>
                         </div>
                     </div>
-                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-sm opacity-60">
-                        <div className="w-3 h-3 border border-slate-200 dark:border-slate-700"></div>
+                    <div className="grid grid-cols-[20px_1fr] items-center gap-4 text-[11px] opacity-60">
+                        <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-200 dark:border-slate-700"></div>
                         <div className="flex gap-2">
-                            <span className="font-bold text-slate-400 min-w-[60px]">สถานะ:</span>
-                            <span className="font-medium text-slate-600 dark:text-slate-400">ห้องว่าง / ยังไม่มีการจอง</span>
+                            <span className="font-black text-slate-400 uppercase tracking-widest min-w-[60px]">สถานะ:</span>
+                            <span className="font-bold text-slate-600 dark:text-slate-400">ห้องว่าง / ยังไม่มีการจอง</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto">
-                <div className="min-w-[1200px]">
+            {/* Horizontal Scroll Hint for Mobile */}
+            <div className="lg:hidden flex items-center justify-center gap-2 text-[10px] font-black text-primary-600 uppercase tracking-widest bg-primary-50 dark:bg-primary-900/20 py-2 rounded-xl border border-primary-100 dark:border-primary-900/30">
+                <ChevronRight className="w-3 h-3 animate-pulse" />
+                เลื่อนขวาเพื่อดูเวลาทั้งหมด
+                <ChevronLeft className="w-3 h-3 animate-pulse" />
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-xl overflow-x-auto custom-scrollbar no-scrollbar-mobile">
+                <div className="min-w-[1000px] lg:min-w-full">
                     <table className="w-full border-collapse table-fixed">
                         <thead>
-                            <tr className="h-10">
-                                <th className="p-4 border-b border-r border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 sticky left-0 z-20 w-56 text-left font-semibold text-gray-700 dark:text-gray-300">
+                            <tr className="h-14">
+                                <th className="p-4 border-b border-r border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 sticky left-0 z-20 w-48 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">
                                     ห้องประชุม
                                 </th>
                                 {hours.map((h, i) => (

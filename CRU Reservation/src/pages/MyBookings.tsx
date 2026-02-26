@@ -182,18 +182,18 @@ const MyBookings = () => {
                                             )}
                                         </div>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 md:flex md:flex-col gap-3 text-sm text-slate-600 dark:text-slate-400 min-w-fit">
-                                            <div className="flex items-center bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg md:bg-transparent md:p-0">
-                                                <Calendar className="w-4 h-4 mr-2 text-primary-500 dark:text-primary-400" />
-                                                {format(startDate, 'd MMMM yyyy', { locale: th })}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-col gap-2 text-[11px] font-black text-slate-500 min-w-fit">
+                                            <div className="flex items-center bg-slate-100/50 dark:bg-slate-800/50 p-2.5 rounded-xl lg:bg-transparent lg:p-0">
+                                                <Calendar className="w-4 h-4 mr-2 text-primary-500" />
+                                                <span className="uppercase tracking-tight">{format(startDate, 'd MMMM yyyy', { locale: th })}</span>
                                             </div>
-                                            <div className="flex items-center bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg md:bg-transparent md:p-0">
-                                                <Clock className="w-4 h-4 mr-2 text-primary-500 dark:text-primary-400" />
-                                                {format(startDate, 'HH:mm')} - {format(endDate, 'HH:mm')} น.
+                                            <div className="flex items-center bg-slate-100/50 dark:bg-slate-800/50 p-2.5 rounded-xl lg:bg-transparent lg:p-0">
+                                                <Clock className="w-4 h-4 mr-2 text-primary-500" />
+                                                <span className="uppercase tracking-tight">{format(startDate, 'HH:mm')} - {format(endDate, 'HH:mm')} น.</span>
                                             </div>
-                                            <div className="flex items-center bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg md:bg-transparent md:p-0">
-                                                <MapPin className="w-4 h-4 mr-2 text-primary-500 dark:text-primary-400" />
-                                                {roomLocation}
+                                            <div className="flex items-center bg-slate-100/50 dark:bg-slate-800/50 p-2.5 rounded-xl lg:bg-transparent lg:p-0">
+                                                <MapPin className="w-4 h-4 mr-2 text-primary-500" />
+                                                <span className="uppercase tracking-tight truncate max-w-[150px]">{roomLocation}</span>
                                             </div>
                                         </div>
                                     </div>

@@ -314,25 +314,25 @@ const BookingModal: React.FC<BookingModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="w-full max-w-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[40px] shadow-2xl overflow-hidden border border-white/20 dark:border-slate-800/50 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-300">
-                <div className="bg-slate-900 dark:bg-black px-6 py-4 relative border-b border-white/5">
-                    <div className="flex items-center justify-between gap-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-300">
+            <div className="w-full max-w-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20 dark:border-slate-800/50 flex flex-col max-h-[95vh] sm:max-h-[90vh] animate-in zoom-in-95 duration-300">
+                <div className="bg-slate-900 dark:bg-black px-5 py-5 relative border-b border-white/5">
+                    <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
                             <h2 className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1.5 leading-none">แบบคำขอใช้ห้องประชุม</h2>
-                            <div className="flex flex-wrap items-center gap-3">
-                                <h1 className="text-xl font-black text-white tracking-tight truncate shrink-0">{room.name}</h1>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                <h1 className="text-lg sm:text-xl font-black text-white tracking-tight truncate shrink-0">{room.name}</h1>
 
                                 {/* Requester Profile Badge - Compact */}
-                                <div className="flex items-center gap-2 bg-white/5 p-1.5 px-2.5 rounded-lg border border-white/5 backdrop-blur-md shrink-0">
-                                    <div className="w-6 h-6 rounded bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                                        <UserIcon className="text-white w-3 h-3" />
+                                <div className="flex items-center gap-2 bg-white/5 p-1.5 px-2.5 rounded-lg border border-white/5 backdrop-blur-md self-start sm:self-auto">
+                                    <div className="w-5 h-5 rounded bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                                        <UserIcon className="text-white w-2.5 h-2.5" />
                                     </div>
                                     <div className="text-[10px] font-bold text-white leading-none">{currentUser.name}</div>
                                 </div>
                             </div>
                         </div>
-                        <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-full transition-colors">
+                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors shrink-0">
                             <X className="w-5 h-5 text-white/40 hover:text-white" />
                         </button>
                     </div>
@@ -341,11 +341,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 {/* body */}
                 <form
                     onSubmit={submit}
-                    className="flex flex-col gap-6 px-8 py-8 overflow-y-auto custom-scrollbar flex-1"
+                    className="flex flex-col gap-6 px-5 sm:px-8 py-6 sm:py-8 overflow-y-auto custom-scrollbar flex-1"
                 >
 
                     {/* Date & Time Selection (One Row) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         {/* Calendar */}
                         <div className="bg-slate-50/50 dark:bg-slate-800/20 rounded-[32px] p-2 border border-slate-100 dark:border-slate-700/30 overflow-hidden flex flex-col items-center">
                             <div className="grid grid-cols-2 p-1 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl mb-1 w-full">

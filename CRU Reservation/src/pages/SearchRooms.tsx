@@ -228,50 +228,53 @@ const SearchRooms = () => {
             </div>
 
             {/* Filters */}
-            <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 transition-colors">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">วันที่</label>
-                    <input
-                        type="date"
-                        className="w-full border border-gray-300 dark:border-slate-700 rounded-lg p-2 dark:bg-slate-800 dark:text-white"
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        min={format(new Date(), "yyyy-MM-dd")}
-                    />
-                </div>
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">ตัวกรองการค้นหา</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="space-y-1">
+                        <label className="block text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase ml-1">วันที่</label>
+                        <input
+                            type="date"
+                            className="w-full border-2 border-slate-100 dark:border-slate-800 rounded-2xl px-3 py-2.5 text-xs font-bold dark:bg-slate-900 dark:text-white focus:border-primary-500 outline-none transition-all"
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            min={format(new Date(), "yyyy-MM-dd")}
+                        />
+                    </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">เวลาเริ่ม</label>
-                    <input
-                        type="time"
-                        className="w-full border border-gray-300 dark:border-slate-700 rounded-lg p-2 dark:bg-slate-800 dark:text-white"
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
-                    />
-                </div>
+                    <div className="space-y-1">
+                        <label className="block text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase ml-1">เวลาเริ่ม</label>
+                        <input
+                            type="time"
+                            className="w-full border-2 border-slate-100 dark:border-slate-800 rounded-2xl px-3 py-2.5 text-xs font-bold dark:bg-slate-900 dark:text-white focus:border-primary-500 outline-none transition-all"
+                            value={startTime}
+                            onChange={(e) => setStartTime(e.target.value)}
+                        />
+                    </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">เวลาสิ้นสุด</label>
-                    <input
-                        type="time"
-                        className="w-full border border-gray-300 dark:border-slate-700 rounded-lg p-2 dark:bg-slate-800 dark:text-white"
-                        value={endTime}
-                        onChange={(e) => setEndTime(e.target.value)}
-                    />
-                    {new Date(`${selectedDate}T${endTime}`) <= new Date(`${selectedDate}T${startTime}`) && (
-                        <div className="text-xs text-red-600 dark:text-red-400 mt-1">เวลาสิ้นสุดต้องอยู่หลังเวลาเริ่ม</div>
-                    )}
-                </div>
+                    <div className="space-y-1">
+                        <label className="block text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase ml-1">เวลาสิ้นสุด</label>
+                        <input
+                            type="time"
+                            className="w-full border-2 border-slate-100 dark:border-slate-800 rounded-2xl px-3 py-2.5 text-xs font-bold dark:bg-slate-900 dark:text-white focus:border-primary-500 outline-none transition-all"
+                            value={endTime}
+                            onChange={(e) => setEndTime(e.target.value)}
+                        />
+                        {new Date(`${selectedDate}T${endTime}`) <= new Date(`${selectedDate}T${startTime}`) && (
+                            <div className="text-[9px] font-bold text-red-500 mt-1 ml-1">เวลาสิ้นสุดต้องอยู่หลังเวลาเริ่ม</div>
+                        )}
+                    </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">ความจุขั้นต่ำ (คน)</label>
-                    <input
-                        type="number"
-                        className="w-full border border-gray-300 dark:border-slate-700 rounded-lg p-2 dark:bg-slate-800 dark:text-white"
-                        value={minCapacity}
-                        onChange={(e) => setMinCapacity(Number(e.target.value))}
-                        min={0}
-                    />
+                    <div className="space-y-1">
+                        <label className="block text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase ml-1">ความจุ (คน)</label>
+                        <input
+                            type="number"
+                            className="w-full border-2 border-slate-100 dark:border-slate-800 rounded-2xl px-3 py-2.5 text-xs font-bold dark:bg-slate-900 dark:text-white focus:border-primary-500 outline-none transition-all"
+                            value={minCapacity}
+                            onChange={(e) => setMinCapacity(Number(e.target.value))}
+                            min={0}
+                        />
+                    </div>
                 </div>
             </div>
 

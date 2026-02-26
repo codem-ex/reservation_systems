@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
-import { LayoutDashboard, Search, CalendarDays, LogOut, Moon, Sun, Settings, HelpCircle } from "lucide-react";
+import { LayoutDashboard, Search, CalendarDays, LogOut, Moon, Sun, Settings, HelpCircle, Menu, X } from "lucide-react";
 import NotificationBell from "../components/NotificationBell";
 import AppParticles from "../components/AppParticles";
 
@@ -25,6 +25,7 @@ export default function MainLayout() {
         }
         return false;
     });
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     useEffect(() => {
         if (darkMode) {
@@ -86,65 +87,100 @@ export default function MainLayout() {
         ].join(" ");
 
     return (
-        // ✅ ทำให้โครงนี้เป็น “หน้าจอเดียว” และกัน body scroll
+        // ✅ Keep original overflow-hidden and h-screen
         <div className="h-screen relative text-slate-900 dark:text-slate-100 overflow-hidden transition-colors duration-300">
-            {/* 3D Background Particles that adapt to Dark/Light mode */}
+            {/* 3D Background Particles */}
             <AppParticles />
 
+            {/* Mobile Navbar - Visible only on mobile */}
+            <div className="md:hidden flex items-center justify-between px-4 h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setIsMobileMenuOpen(true)}
+                        className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 active:scale-95 transition-transform"
+                    >
+                        <Menu className="w-6 h-6" />
+                    </button>
+                    <span className="font-bold text-primary-700 dark:text-primary-400">CRU RESERVE</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <NotificationBell userId={supabaseUser?.id || ""} />
+                </div>
+            </div>
+
             <div className="flex h-full relative z-10">
-                {/* Sidebar */}
-                <aside className="w-72 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border-r border-slate-200 dark:border-slate-800 hidden md:flex flex-col transition-colors">
-                    {/* ✅ sticky ทำให้มัน “อยู่ในจอ” เวลา content ขวาเลื่อน */}
-                    <div className="sticky top-0 flex flex-col h-screen">
-                        {/* Brand */}
-                        <Link to="/" className="p-6 block hover:opacity-80 transition-opacity group">
-                            <div className="text-2xl font-extrabold text-primary-700 leading-tight group-hover:text-primary-600 transition-colors">
-                                ระบบจองห้อง
-                                <br />
-                                ประชุม
-                            </div>
-                            <div className="text-sm text-slate-500 mt-2">
-                                มหาวิทยาลัยราชภัฏจันทรเกษม
-                            </div>
-                        </Link>
+                {/* Mobile Drawer Backdrop */}
+                {isMobileMenuOpen && (
+                    <div
+                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] md:hidden"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                    />
+                )}
+
+                {/* Sidebar - Desktop (Original) & Mobile Drawer */}
+                <aside className={`
+                    fixed inset-y-0 left-0 z-[70] w-72 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 
+                    transform transition-transform duration-300 ease-in-out
+                    md:relative md:translate-x-0 md:flex md:bg-white/70 md:dark:bg-slate-900/70 md:backdrop-blur-md
+                    ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+                `}>
+                    <div className="flex flex-col h-full w-full">
+                        {/* Brand (Desktop View) */}
+                        <div className="p-6 flex items-center justify-between">
+                            <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="block hover:opacity-80 transition-opacity group">
+                                <div className="text-2xl font-extrabold text-primary-700 leading-tight group-hover:text-primary-600 transition-colors">
+                                    ระบบจองห้อง
+                                    <br />
+                                    ประชุม
+                                </div>
+                                <div className="text-sm text-slate-500 mt-2">
+                                    มหาวิทยาลัยราชภัฏจันทรเกษม
+                                </div>
+                            </Link>
+
+                            {/* Close button for mobile drawer */}
+                            <button
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="md:hidden p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
 
                         {/* Nav */}
-                        <nav className="px-4 space-y-2">
-                            <NavLink to="/" end className={navItemClass}>
+                        <nav className="px-4 space-y-2 flex-1 overflow-y-auto">
+                            <NavLink to="/" end className={navItemClass} onClick={() => setIsMobileMenuOpen(false)}>
                                 <LayoutDashboard className="w-5 h-5 mr-3" />
                                 หน้าแรก
                             </NavLink>
 
-                            <NavLink to="/search" className={navItemClass}>
+                            <NavLink to="/search" className={navItemClass} onClick={() => setIsMobileMenuOpen(false)}>
                                 <Search className="w-5 h-5 mr-3" />
                                 ค้นหาห้องประชุม
                             </NavLink>
 
-                            <NavLink to="/schedule" className={navItemClass}>
+                            <NavLink to="/schedule" className={navItemClass} onClick={() => setIsMobileMenuOpen(false)}>
                                 <CalendarDays className="w-5 h-5 mr-3" />
                                 ตารางเวลาห้อง
                             </NavLink>
 
-                            <NavLink to="/bookings" className={navItemClass}>
+                            <NavLink to="/bookings" className={navItemClass} onClick={() => setIsMobileMenuOpen(false)}>
                                 <CalendarDays className="w-5 h-5 mr-3" />
                                 การจองของฉัน
                             </NavLink>
 
-                            <NavLink to="/admin" className={navItemClass}>
+                            <NavLink to="/admin" className={navItemClass} onClick={() => setIsMobileMenuOpen(false)}>
                                 <Settings className="w-5 h-5 mr-3" />
                                 จัดการระบบ
                             </NavLink>
 
-                            <NavLink to="/help" className={navItemClass}>
+                            <NavLink to="/help" className={navItemClass} onClick={() => setIsMobileMenuOpen(false)}>
                                 <HelpCircle className="w-5 h-5 mr-3" />
                                 คู่มือการใช้งาน
                             </NavLink>
                         </nav>
 
-                        {/* Spacer ให้ส่วนล่าง “ติดก้น sidebar” ตลอด */}
-                        <div className="flex-1" />
-
-                        {/* Night Mode & Notifications */}
+                        {/* Night Mode & Notifications (Visible on desktop sidebar footer) */}
                         <div className="px-6 py-4 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
                             <button
                                 onClick={() => setDarkMode(!darkMode)}
@@ -154,12 +190,15 @@ export default function MainLayout() {
                                 {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                             </button>
 
-                            <NotificationBell userId={supabaseUser?.id || ""} />
+                            {/* Show bell here only on desktop; mobile has it in Top Navbar */}
+                            <div className="hidden md:block">
+                                <NotificationBell userId={supabaseUser?.id || ""} />
+                            </div>
                         </div>
 
-                        {/* Profile + Logout (อยู่ล่างเสมอ) */}
+                        {/* Profile + Logout */}
                         <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-transparent transition-colors">
-                            <Link to="/profile">
+                            <Link to="/profile" onClick={() => setIsMobileMenuOpen(false)}>
                                 <div className="flex items-center p-3 bg-slate-50/50 dark:bg-slate-800/50 rounded-xl mb-3 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer border border-transparent dark:border-slate-700/50 shadow-sm">
                                     <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900/50 flex items-center justify-center text-primary-600 dark:text-primary-400 font-bold mr-3 overflow-hidden shadow-inner font-sans">
                                         {profile?.avatar_url ? (
@@ -175,7 +214,7 @@ export default function MainLayout() {
                                     </div>
 
                                     <div className="min-w-0">
-                                        <p className="text-sm font-medium text-gray-900 truncate">
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                                             {displayName}
                                         </p>
                                         <p className="text-xs text-gray-500 truncate">
@@ -201,9 +240,8 @@ export default function MainLayout() {
                 </aside>
 
                 {/* Content */}
-                {/* ✅ ให้ฝั่งขวาเป็นตัว scroll หลัก */}
                 <main className="flex-1 overflow-y-auto">
-                    <div className="p-6 md:p-8">
+                    <div className="p-4 md:p-8">
                         <Outlet />
                     </div>
                 </main>
