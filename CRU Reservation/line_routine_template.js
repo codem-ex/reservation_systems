@@ -1,23 +1,47 @@
 /**
- * 📅 LINE Daily Notification Routine for Room Reservations
+ * 📅 LINE Daily Notification Routine for Room Reservations (Enhanced)
  * วางโค้ดนี้ลงใน Google Apps Script (script.google.com)
- * และตั้งค่า Trigger แบบ "Time-driven" ให้รันทุกวันเวลา 08:00 - 09:00 น.
+ * 
+ * วิธีตั้งค่า Trigger:
+ * 1. ฟังก์ชัน reportToday() -> ตั้งรันทุกวันช่วง 07:00 - 08:00 น.
+ * 2. ฟังก์ชัน reportTomorrow() -> ตั้งรันทุกวันช่วง 18:00 - 19:00 น.
  */
 
 // 🛠️ ตั้งค่าข้อมูลการเชื่อมต่อ
 const CONFIG = {
     SUPABASE_URL: "YOUR_SUPABASE_URL",
-    SUPABASE_KEY: "YOUR_SUPABASE_SERVICE_ROLE_KEY", // ต้องใช้ Service Role เพื่อดึงข้อมูลข้ามตารางได้
+    SUPABASE_KEY: "YOUR_SUPABASE_SERVICE_ROLE_KEY",
     LINE_ACCESS_TOKEN: "YOUR_LINE_CHANNEL_ACCESS_TOKEN",
-    LINE_GROUP_ID: "YOUR_LINE_GROUP_ID" // หรือ User ID
+    LINE_GROUP_ID: "YOUR_LINE_GROUP_ID"
 };
 
-function sendDailyRoomReport() {
-    const today = new Date();
-    const dateStr = Utilities.formatDate(today, "GMT+7", "yyyy-MM-dd");
+/**
+ * [Entry Point 1] สำหรับส่งรายงานของวันนี้ (รันช่วงเช้า)
+ */
+function reportToday() {
+    sendRoomReport(0);
+}
+
+/**
+ * [Entry Point 2] สำหรับส่งรายงานของวันพรุ่งนี้ (รันช่วงเย็น)
+ */
+function reportTomorrow() {
+    sendRoomReport(1);
+}
+
+/**
+ * ฟังก์ชันหลักในการดึงข้อมูลและส่งรายงาน
+ * @param {number} daysOffset - 0 สำหรับวันนี้, 1 สำหรับวันพรุ่งนี้
+ */
+function sendRoomReport(daysOffset) {
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + daysOffset);
+    const dateStr = Utilities.formatDate(targetDate, "GMT+7", "yyyy-MM-dd");
+
+    const typeText = daysOffset === 0 ? "วันนี้" : "วันพรุ่งนี้";
 
     // 1. ดึงข้อมูลการจองจาก Supabase
-    // ดึงรายการที่ได้รับอนุมัติแล้ว และมีการจองคาบเกี่ยวภายในวันนี้
+    // ดึงรายการที่ได้รับอนุมัติแล้ว และมีการจองคาบเกี่ยวภายในวันที่กำหนด
     const url = `${CONFIG.SUPABASE_URL}/rest/v1/reservations?select=*,rooms(name),profiles(display_name)&status=eq.APPROVED&or=(start_at.fts.${dateStr},setup_start_at.fts.${dateStr})`;
 
     const options = {
@@ -32,15 +56,15 @@ function sendDailyRoomReport() {
         const response = UrlFetchApp.fetch(url, options);
         const reservations = JSON.parse(response.getContentText());
 
+        let header = `📅 รายงานการใช้ห้องประชุม${typeText}\nประจำวันที่: ${Utilities.formatDate(targetDate, "GMT+7", "dd/MM/yyyy")}\n------------------------------`;
+
         if (reservations.length === 0) {
-            // สามารถเลือกที่จะไม่ส่งข้อความถ้าไม่มีการจอง
-            // return; 
-            sendLineMessage("📅 รายงานการใช้ห้องประชุมวันนี้\n------------------------------\n❌ วันนี้ไม่มีการจองห้องประชุม");
+            sendLineMessage(`${header}\n❌ ไม่มีรายการจองห้องประชุม`);
             return;
         }
 
         // 2. สร้าง Template ข้อความ
-        let message = `📅 รายงานการใช้ห้องประชุมวันนี้\nวันที่: ${Utilities.formatDate(today, "GMT+7", "dd/MM/yyyy")}\n------------------------------`;
+        let message = header;
 
         reservations.forEach((res, index) => {
             const roomName = res.rooms ? res.rooms.name : "ไม่ระบุห้อง";
@@ -51,11 +75,15 @@ function sendDailyRoomReport() {
             const eventStart = formatTime(res.start_at);
             const eventEnd = formatTime(res.end_at);
 
+            // ส่วนของวันที่ (เช่น 9-13)
+            const dateRange = formatDateRange(res.start_at, res.end_at);
+
             message += `\n\n🏢 ${index + 1}. ${roomName}`;
             message += `\n👤 ผู้จอง: ${requester}`;
             message += `\n📝 หัวข้อ: ${res.title}`;
-            message += `\n🛠️ ช่วงเตรียม: ${setupStart} - ${setupEnd} น.`;
-            message += `\n🎬 ช่วงจัดงาน: ${eventStart} - ${eventEnd} น.`;
+            message += `\n🗓️ ช่วงวันที่: ${dateRange}`;
+            message += `\n🛠️ เตรียม: ${setupStart} - ${setupEnd} น.`;
+            message += `\n🎬 จัดงาน: ${eventStart} - ${eventEnd} น.`;
             message += `\n------------------------------`;
         });
 
@@ -65,6 +93,33 @@ function sendDailyRoomReport() {
     } catch (err) {
         console.error("Error:", err);
     }
+}
+
+/**
+ * รูปแบบวันที่แบบช่วง เช่น "9" หรือ "9-13"
+ */
+function formatDateRange(isoStart, isoEnd) {
+    if (!isoStart || !isoEnd) return "---";
+    const start = new Date(isoStart);
+    const end = new Date(isoEnd);
+
+    const dStart = start.getDate();
+    const dEnd = end.getDate();
+    const mStart = start.getMonth();
+    const mEnd = end.getMonth();
+
+    // ถ้าเป็นวันเดียวกัน
+    if (dStart === dEnd && mStart === mEnd) {
+        return `${dStart}`;
+    }
+
+    // ถ้าคนละเดือน
+    if (mStart !== mEnd) {
+        return `${dStart}/${mStart + 1} - ${dEnd}/${mEnd + 1}`;
+    }
+
+    // ถ้าเดือนเดียวกันแต่คนละวัน
+    return `${dStart}-${dEnd}`;
 }
 
 function formatTime(isoString) {
