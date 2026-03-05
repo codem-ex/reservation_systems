@@ -1,0 +1,362 @@
+[
+    {
+        "table_name": "approver_chain_steps",
+        "column_name": "id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "approver_chain_steps",
+        "column_name": "chain_id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "approver_chain_steps",
+        "column_name": "stage_no",
+        "data_type": "integer"
+    },
+    {
+        "table_name": "approver_chain_steps",
+        "column_name": "approver_user_id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "approver_chain_steps",
+        "column_name": "is_active",
+        "data_type": "boolean"
+    },
+    {
+        "table_name": "approver_chains",
+        "column_name": "id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "approver_chains",
+        "column_name": "name",
+        "data_type": "text"
+    },
+    {
+        "table_name": "approver_chains",
+        "column_name": "description",
+        "data_type": "text"
+    },
+    {
+        "table_name": "approver_chains",
+        "column_name": "is_active",
+        "data_type": "boolean"
+    },
+    {
+        "table_name": "approver_chains",
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone"
+    },
+    {
+        "table_name": "audit_logs",
+        "column_name": "id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "audit_logs",
+        "column_name": "reservation_id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "audit_logs",
+        "column_name": "user_id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "audit_logs",
+        "column_name": "action_type",
+        "data_type": "text"
+    },
+    {
+        "table_name": "audit_logs",
+        "column_name": "details",
+        "data_type": "text"
+    },
+    {
+        "table_name": "audit_logs",
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone"
+    },
+    {
+        "table_name": "notifications",
+        "column_name": "id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "notifications",
+        "column_name": "user_id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "notifications",
+        "column_name": "title",
+        "data_type": "text"
+    },
+    {
+        "table_name": "notifications",
+        "column_name": "message",
+        "data_type": "text"
+    },
+    {
+        "table_name": "notifications",
+        "column_name": "type",
+        "data_type": "text"
+    },
+    {
+        "table_name": "notifications",
+        "column_name": "is_read",
+        "data_type": "boolean"
+    },
+    {
+        "table_name": "notifications",
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone"
+    },
+    {
+        "table_name": "profiles",
+        "column_name": "id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "profiles",
+        "column_name": "display_name",
+        "data_type": "text"
+    },
+    {
+        "table_name": "profiles",
+        "column_name": "email",
+        "data_type": "text"
+    },
+    {
+        "table_name": "profiles",
+        "column_name": "is_admin",
+        "data_type": "boolean"
+    },
+    {
+        "table_name": "profiles",
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone"
+    },
+    {
+        "table_name": "profiles",
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone"
+    },
+    {
+        "table_name": "profiles",
+        "column_name": "avatar_url",
+        "data_type": "text"
+    },
+    {
+        "table_name": "profiles",
+        "column_name": "department",
+        "data_type": "text"
+    },
+    {
+        "table_name": "profiles",
+        "column_name": "mobile_phone",
+        "data_type": "text"
+    },
+    {
+        "table_name": "profiles",
+        "column_name": "stage_no",
+        "data_type": "integer"
+    },
+    {
+        "table_name": "reservation_approvals",
+        "column_name": "id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "reservation_approvals",
+        "column_name": "reservation_id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "reservation_approvals",
+        "column_name": "chain_id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "reservation_approvals",
+        "column_name": "stage_no",
+        "data_type": "integer"
+    },
+    {
+        "table_name": "reservation_approvals",
+        "column_name": "approver_user_id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "reservation_approvals",
+        "column_name": "decision",
+        "data_type": "USER-DEFINED"
+    },
+    {
+        "table_name": "reservation_approvals",
+        "column_name": "decision_note",
+        "data_type": "text"
+    },
+    {
+        "table_name": "reservation_approvals",
+        "column_name": "decided_at",
+        "data_type": "timestamp with time zone"
+    },
+    {
+        "table_name": "reservation_approvals",
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "room_id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "requester_id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "title",
+        "data_type": "text"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "purpose",
+        "data_type": "text"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "status",
+        "data_type": "USER-DEFINED"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "current_stage",
+        "data_type": "integer"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "chain_id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "start_at",
+        "data_type": "timestamp with time zone"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "end_at",
+        "data_type": "timestamp with time zone"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "setup_date",
+        "data_type": "date"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "setup_start",
+        "data_type": "text"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "setup_end",
+        "data_type": "text"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "setup_start_at",
+        "data_type": "timestamp with time zone"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "setup_end_at",
+        "data_type": "timestamp with time zone"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone"
+    },
+    {
+        "table_name": "reservations",
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone"
+    },
+    {
+        "table_name": "rooms",
+        "column_name": "id",
+        "data_type": "uuid"
+    },
+    {
+        "table_name": "rooms",
+        "column_name": "name",
+        "data_type": "text"
+    },
+    {
+        "table_name": "rooms",
+        "column_name": "location",
+        "data_type": "text"
+    },
+    {
+        "table_name": "rooms",
+        "column_name": "capacity",
+        "data_type": "integer"
+    },
+    {
+        "table_name": "rooms",
+        "column_name": "amenities",
+        "data_type": "jsonb"
+    },
+    {
+        "table_name": "rooms",
+        "column_name": "description",
+        "data_type": "text"
+    },
+    {
+        "table_name": "rooms",
+        "column_name": "status",
+        "data_type": "text"
+    },
+    {
+        "table_name": "rooms",
+        "column_name": "images",
+        "data_type": "jsonb"
+    },
+    {
+        "table_name": "rooms",
+        "column_name": "is_active",
+        "data_type": "boolean"
+    },
+    {
+        "table_name": "rooms",
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone"
+    },
+    {
+        "table_name": "rooms",
+        "column_name": "image_url",
+        "data_type": "text"
+    },
+    {
+        "table_name": "rooms",
+        "column_name": "image_path",
+        "data_type": "text"
+    },
+    {
+        "table_name": "rooms",
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone"
+    }
+]

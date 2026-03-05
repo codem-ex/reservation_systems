@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { X, User as UserIcon, Check, Users } from "lucide-react";
+import { X, User as UserIcon, Check, Users, AlertCircle } from "lucide-react";
 
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -162,6 +162,37 @@ const BookingModal: React.FC<BookingModalProps> = ({
     const [loading, setLoading] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [existingReservations, setExistingReservations] = useState<any[]>([]);
+    const [step, setStep] = useState(1);
+
+    // Custom Alert Modal
+    const [alertOpen, setAlertOpen] = useState(false);
+    const [alertTitle, setAlertTitle] = useState("");
+    const [alertMessage, setAlertMessage] = useState("");
+    const [alertType, setAlertType] = useState<"info" | "success" | "warning" | "error">("info");
+
+    const showCustomAlert = (title: string, message: string, type: "info" | "success" | "warning" | "error" = "info") => {
+        setAlertTitle(title);
+        setAlertMessage(message);
+        setAlertType(type);
+        setAlertOpen(true);
+    };
+
+    const busyDateStrings = useMemo(() => {
+        const set = new Set<string>();
+        existingReservations.forEach(r => {
+            let curr = dayjs(r.start_at).startOf('day');
+            const end = dayjs(r.end_at).startOf('day');
+            while (!curr.isAfter(end)) {
+                set.add(curr.format('YYYY-MM-DD'));
+                curr = curr.add(1, 'day');
+            }
+        });
+        return set;
+    }, [existingReservations]);
+
+    const disabledDates = useMemo(() => {
+        return Array.from(busyDateStrings).map(s => dayjs(s).toDate());
+    }, [busyDateStrings]);
 
 
 
@@ -219,34 +250,48 @@ const BookingModal: React.FC<BookingModalProps> = ({
         });
     }, [useStart, useEnd, startTime, endTime, existingReservations]);
 
-    const validate = () => {
-        if (!title.trim()) return "กรุณาระบุหัวข้อการขอใช้ห้องประชุม";
-        if (!purpose.trim()) return "กรุณาระบุวัตถุประสงค์การใช้งาน";
+    const validateStep = (s: number) => {
+        if (s === 1) {
+            const useS = timeToMinutes(startTime);
+            const useE = timeToMinutes(endTime);
+            if (!Number.isFinite(useS) || !Number.isFinite(useE)) return "เวลาใช้งานไม่ถูกต้อง";
+            if (useS >= useE) return "เวลาใช้งาน: เวลาเริ่มต้องน้อยกว่าเวลาสิ้นสุด";
 
-        const useS = timeToMinutes(startTime);
-        const useE = timeToMinutes(endTime);
-        if (!Number.isFinite(useS) || !Number.isFinite(useE)) return "เวลาใช้งานไม่ถูกต้อง";
-        if (useS >= useE) return "เวลาใช้งาน: เวลาเริ่มต้องน้อยกว่าเวลาสิ้นสุด";
+            const setS = timeToMinutes(setupStart);
+            const setE = timeToMinutes(setupEnd);
+            if (!Number.isFinite(setS) || !Number.isFinite(setE)) return "เวลาจัดเตรียมไม่ถูกต้อง";
+            if (setS >= setE) return "เวลาจัดเตรียม: เวลาเริ่มต้องน้อยกว่าเวลาสิ้นสุด";
 
-        const setS = timeToMinutes(setupStart);
-        const setE = timeToMinutes(setupEnd);
-        if (!Number.isFinite(setS) || !Number.isFinite(setE)) return "เวลาจัดเตรียมไม่ถูกต้อง";
-        if (setS >= setE) return "เวลาจัดเตรียม: เวลาเริ่มต้องน้อยกว่าเวลาสิ้นสุด";
+            if (hasConflict) return "ช่วงเวลานี้ถูกจองไปแล้ว กรุณาเลือกเวลาอื่น";
+        }
 
-        if (hasConflict) return "ช่วงเวลานี้ถูกจองไปแล้ว กรุณาเลือกเวลาอื่น";
+        if (s === 2) {
+            if (!title.trim()) return "กรุณาระบุหัวข้อการขอใช้ห้องประชุม";
+            if (!purpose.trim()) return "กรุณาระบุวัตถุประสงค์การใช้งาน";
+            if (!guestCount || Number(guestCount) < 1) return "กรุณาระบุจำนวนผู้ร่วมอย่างน้อย 1 คน";
+        }
 
         return "";
     };
 
-    const submit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const nextStep = () => {
+        const msg = validateStep(step);
+        if (msg) return showCustomAlert("ข้อมูลไม่ครบถ้วน", msg, "warning");
+        if (step < 3) setStep(step + 1);
+    };
 
-        const msg = validate();
-        if (msg) return alert(msg);
+    const prevStep = () => {
+        if (step > 1) setStep(step - 1);
+    };
+
+    const submit = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+
+        const msg = validateStep(2); // วัลลิเดทข้อมูลหลักอีกครั้ง
+        if (msg) return showCustomAlert("ข้อมูลไม่ครบถ้วน", msg, "warning");
 
         setLoading(true);
         try {
-            // ✅ ทำให้ profiles.email ไม่ว่าง (แก้ root cause ของ to_email=null)
             await ensureProfileEmail();
 
             const payload = {
@@ -267,7 +312,6 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 setup_start_at: buildISO(setupStartDate, setupStart),
                 setup_end_at: buildISO(setupEndDate, setupEnd, true),
 
-                // ✅ เริ่มต้นที่ขั้นตอนที่ 1 (จากทั้งหมด 2 ขั้นตอน)
                 status: "PENDING",
                 current_stage: 1
             };
@@ -280,7 +324,6 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
             if (error) throw error;
 
-            // ✅ 1. Add notification for the user who booked
             await supabase.from("notifications").insert({
                 user_id: currentUser.id,
                 title: "ส่งคำขอจองห้องแล้ว",
@@ -289,7 +332,6 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 is_read: false
             });
 
-            // ✅ 2. Notify all Admins that there is a new request
             const { data: admins } = await supabase.from("profiles").select("id").eq("is_admin", true);
             if (admins && admins.length > 0) {
                 const adminNotifs = admins.map(admin => ({
@@ -298,7 +340,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     message: `มีรายการขอใช้ห้อง "${room.name}" จากคุณ ${currentUser.name} (หัวข้อ: ${title})`,
                     type: 'new_reservation',
                     is_read: false
-                })).filter(n => n.user_id !== currentUser.id); // Don't notify self if admin is the one booking
+                })).filter(n => n.user_id !== currentUser.id);
 
                 if (adminNotifs.length > 0) {
                     await supabase.from("notifications").insert(adminNotifs);
@@ -307,7 +349,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
             setShowSuccess(true);
         } catch (err: any) {
-            alert(err?.message ?? "บันทึกไม่สำเร็จ");
+            showCustomAlert("บันทึกไม่สำเร็จ", err?.message ?? "เกิดข้อผิดพลาดในการบันทึกข้อมูล", "error");
         } finally {
             setLoading(false);
         }
@@ -338,129 +380,237 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     </div>
                 </div>
 
-                {/* body */}
-                <form
-                    onSubmit={submit}
-                    className="flex flex-col gap-6 px-5 sm:px-8 py-6 sm:py-8 overflow-y-auto custom-scrollbar flex-1"
-                >
-
-                    {/* Date & Time Selection (One Row) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {/* Calendar */}
-                        <div className="bg-slate-50/50 dark:bg-slate-800/20 rounded-[32px] p-2 border border-slate-100 dark:border-slate-700/30 overflow-hidden flex flex-col items-center">
-                            <div className="grid grid-cols-2 p-1 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl mb-1 w-full">
-                                <button
-                                    type="button"
-                                    onClick={() => setActive("setup")}
-                                    className={`py-1.5 rounded-lg text-[10px] font-black transition-all ${active === "setup" ? "bg-white dark:bg-slate-800 text-yellow-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
-                                >
-                                    จัดเตรียม
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setActive("use")}
-                                    className={`py-1.5 rounded-lg text-[10px] font-black transition-all ${active === "use" ? "bg-white dark:bg-slate-800 text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
-                                >
-                                    วันใช้จริง
-                                </button>
-                            </div>
-                            <div className="transform scale-[0.8] origin-top -mt-2 -mb-8">
-                                <DateRange
-                                    locale={th}
-                                    ranges={[useRange, setupRange]}
-                                    onChange={onRangeChange}
-                                    focusedRange={active === "use" ? [0, 0] : [1, 0]}
-                                    showDateDisplay={false}
-                                    months={1}
-                                    direction="horizontal"
-                                    rangeColors={["#4f46e5", "#f59e0b"]}
-                                    minDate={startOfDay(new Date())}
-                                />
-                            </div>
-                            <div className="w-full text-center py-2 text-[10px] border-t border-slate-100 dark:border-slate-800 mt-2">
-                                <span className="font-black text-slate-800 dark:text-white uppercase tracking-wider">
-                                    {active === "use" ? labelUse : labelSetup}
+                {/* Stepper Indicator */}
+                <div className="px-8 pt-4 pb-0">
+                    <div className="flex items-center gap-2">
+                        {[1, 2, 3].map((s) => (
+                            <div key={s} className="flex-1 flex flex-col gap-1.5">
+                                <div className={`h-1.5 rounded-full transition-all duration-500 ${step >= s ? "bg-indigo-600" : "bg-slate-200 dark:bg-slate-800"}`} />
+                                <span className={`text-[10px] font-black uppercase tracking-tighter text-center ${step === s ? "text-indigo-600" : "text-slate-400"}`}>
+                                    {s === 1 ? "วันและเวลา" : s === 2 ? "ข้อมูลการจอง" : "ตรวจสอบ"}
                                 </span>
                             </div>
-                        </div>
-
-                        {/* Times */}
-                        <div className="flex flex-col gap-3">
-                            <div className="bg-yellow-50/40 dark:bg-yellow-900/5 border border-yellow-100 dark:border-yellow-900/20 rounded-2xl p-3 flex flex-col gap-2">
-                                <div className="text-[8px] font-black text-yellow-600 uppercase tracking-widest text-center">ช่วงเวลาจัดเตรียม</div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <CustomTimePicker value={setupStart} onChange={setSetupStart} label="เริ่ม" colorClass="yellow" />
-                                    <CustomTimePicker value={setupEnd} onChange={setSetupEnd} label="จบ" colorClass="yellow" />
-                                </div>
-                            </div>
-                            <div className="bg-indigo-50/40 dark:bg-indigo-900/5 border border-indigo-100 dark:border-indigo-900/20 rounded-2xl p-3 flex flex-col gap-2">
-                                <div className="text-[8px] font-black text-indigo-600 uppercase tracking-widest text-center">ช่วงเวลาใช้งานจริง</div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <CustomTimePicker value={startTime} onChange={setStartTime} label="เข้า" colorClass="indigo" />
-                                    <CustomTimePicker value={endTime} onChange={setEndTime} label="ออก" colorClass="indigo" />
-                                </div>
-                            </div>
-                        </div>
+                        ))}
                     </div>
+                </div>
 
-                    {/* Form Fields */}
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">หัวข้อการจอง</label>
-                                <input
-                                    value={title}
-                                    onChange={(e) => setTitle(e.target.value)}
-                                    placeholder="หัวข้อการประชุม..."
-                                    className="w-full bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold dark:text-white focus:border-indigo-500 outline-none transition-all"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">จำนวนผู้ร่วม (คน)</label>
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        min={1}
-                                        value={guestCount}
-                                        onFocus={(e) => e.target.select()}
-                                        onChange={(e) => setGuestCount(e.target.value === "" ? "" : Number(e.target.value))}
-                                        className="w-full bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-xl px-10 py-2.5 text-xs font-black text-slate-800 dark:text-white focus:border-indigo-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                {/* body */}
+                <div className="flex flex-col gap-6 px-5 sm:px-8 py-6 sm:py-8 overflow-y-auto custom-scrollbar flex-1">
+                    {step === 1 && (
+                        <div className="animate-in slide-in-from-right-4 duration-300 space-y-6">
+                            {/* Calendar - Rectangular & Centered */}
+                            <div className="mx-auto w-full max-w-[520px] bg-slate-50/50 dark:bg-slate-800/20 rounded-3xl p-4 border border-slate-100 dark:border-slate-700/30 overflow-hidden flex flex-col items-center shadow-sm">
+                                <div className="grid grid-cols-2 p-1 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl mb-4 w-[280px]">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActive("setup")}
+                                        className={`py-2 rounded-lg text-sm font-black transition-all ${active === "setup" ? "bg-white dark:bg-slate-800 text-yellow-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                                    >
+                                        จัดเตรียม
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActive("use")}
+                                        className={`py-2 rounded-lg text-sm font-black transition-all ${active === "use" ? "bg-white dark:bg-slate-800 text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                                    >
+                                        วันใช้จริง
+                                    </button>
+                                </div>
+                                <div className="w-full flex justify-center transform scale-100 origin-top mb-4 rounded-2xl overflow-hidden shadow-sm">
+                                    <DateRange
+                                        locale={th}
+                                        ranges={[useRange, setupRange]}
+                                        onChange={onRangeChange}
+                                        focusedRange={active === "use" ? [0, 0] : [1, 0]}
+                                        showDateDisplay={false}
+                                        months={1}
+                                        direction="horizontal"
+                                        rangeColors={["#4f46e5", "#f59e0b"]}
+                                        minDate={startOfDay(new Date())}
+                                        disabledDates={disabledDates}
+                                        dayContentRenderer={(day: Date) => {
+                                            const dateStr = dayjs(day).format('YYYY-MM-DD');
+                                            const isBusy = busyDateStrings.has(dateStr);
+                                            return (
+                                                <div className="relative w-full h-full flex flex-col items-center justify-center group/day">
+                                                    <span className={`z-10 ${isBusy ? 'opacity-50' : ''}`}>{day.getDate()}</span>
+                                                    {isBusy && (
+                                                        <div
+                                                            className="absolute bottom-1 w-4 h-[3px] bg-red-500 rounded-full z-20 shadow-sm shadow-red-200"
+                                                            title="ไม่ว่าง"
+                                                        />
+                                                    )}
+                                                </div>
+                                            );
+                                        }}
                                     />
-                                    <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                </div>
+                                <div className="w-full text-center py-2.5 text-sm border-t border-slate-100 dark:border-slate-800 mt-1 bg-white dark:bg-slate-900/50 rounded-xl shadow-sm">
+                                    <span className="font-black text-slate-800 dark:text-white uppercase tracking-wider text-sm">
+                                        {active === "use" ? labelUse : labelSetup}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Times - Bottom Row */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="bg-yellow-50/40 dark:bg-yellow-900/5 border border-yellow-100 dark:border-yellow-900/20 rounded-2xl p-3 flex flex-col gap-2">
+                                    <div className="text-[10px] font-black text-yellow-600 uppercase tracking-widest text-center">ช่วงเวลาจัดเตรียม</div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <CustomTimePicker value={setupStart} onChange={setSetupStart} label="เริ่ม" colorClass="yellow" />
+                                        <CustomTimePicker value={setupEnd} onChange={setSetupEnd} label="จบ" colorClass="yellow" />
+                                    </div>
+                                </div>
+                                <div className="bg-indigo-50/40 dark:bg-indigo-900/5 border border-indigo-100 dark:border-indigo-900/20 rounded-2xl p-3 flex flex-col gap-2">
+                                    <div className="text-[10px] font-black text-indigo-600 uppercase tracking-widest text-center">ช่วงเวลาใช้งานจริง</div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <CustomTimePicker value={startTime} onChange={setStartTime} label="เข้า" colorClass="indigo" />
+                                        <CustomTimePicker value={endTime} onChange={setEndTime} label="ออก" colorClass="indigo" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {hasConflict && (
+                                <div className="p-3 bg-red-50 text-red-600 text-center font-bold rounded-2xl border border-red-100 animate-pulse text-sm">
+                                    ⚠️ ช่วงเวลานี้ถูกจองไปแล้ว
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {step === 2 && (
+                        <div className="animate-in slide-in-from-right-4 duration-300 space-y-6">
+                            {/* Form Fields - Balanced Font Size */}
+                            <div className="space-y-5">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">หัวข้อการจอง</label>
+                                    <input
+                                        value={title}
+                                        onChange={(e) => setTitle(e.target.value)}
+                                        placeholder="ระบุหัวข้อการประชุมหรือกิจกรรม..."
+                                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-2.5 text-lg font-bold dark:text-white focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">จำนวนผู้ร่วม (คน)</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            value={guestCount}
+                                            onFocus={(e) => e.target.select()}
+                                            onChange={(e) => setGuestCount(e.target.value === "" ? "" : Number(e.target.value))}
+                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-11 py-2.5 text-lg font-black text-slate-800 dark:text-white focus:border-indigo-500 focus:bg-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none shadow-sm"
+                                        />
+                                        <Users className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">วัตถุประสงค์</label>
+                                    <textarea
+                                        rows={4}
+                                        value={purpose}
+                                        onChange={(e) => setPurpose(e.target.value)}
+                                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-4 py-3 text-lg font-bold dark:text-white focus:border-indigo-500 focus:bg-white outline-none resize-none shadow-sm"
+                                        placeholder="ระบุวัตถุประสงค์การใช้งานห้อง..."
+                                    />
                                 </div>
                             </div>
                         </div>
+                    )}
 
-                        <div className="space-y-1">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">วัตถุประสงค์</label>
-                            <textarea
-                                rows={2}
-                                value={purpose}
-                                onChange={(e) => setPurpose(e.target.value)}
-                                className="w-full bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-xl px-3 py-2.5 text-xs font-bold dark:text-white focus:border-indigo-500 outline-none resize-none"
-                                placeholder="วัตถุประสงค์การใช้งาน..."
-                            />
+                    {step === 3 && (
+                        <div className="animate-in slide-in-from-right-4 duration-300">
+                            <div className="bg-slate-50 dark:bg-slate-800/40 rounded-3xl p-5 space-y-4 border border-slate-100 dark:border-slate-700/50">
+                                <div className="text-center mb-2">
+                                    <h3 className="text-lg font-black text-slate-900 dark:text-white mb-0.5">สรุปข้อมูลการจอง</h3>
+                                    <p className="text-slate-500 text-[9px]">โปรดตรวจสอบความถูกต้องก่อนกดยืนยัน</p>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-3">
+                                    <div className="flex flex-col gap-0.5 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+                                        <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest">ชื่อห้อง</span>
+                                        <span className="text-base font-bold dark:text-white">{room.name}</span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="flex flex-col gap-0.5 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+                                            <span className="text-[8px] font-black text-yellow-600 uppercase tracking-widest">วันจัดเตรียม</span>
+                                            <span className="text-sm font-bold dark:text-white">{labelSetup}</span>
+                                            <span className="text-[10px] font-medium text-slate-500">{setupStart} - {setupEnd} น.</span>
+                                        </div>
+                                        <div className="flex flex-col gap-0.5 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+                                            <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest">วันใช้งานจริง</span>
+                                            <span className="text-sm font-bold dark:text-white">{labelUse}</span>
+                                            <span className="text-[10px] font-medium text-slate-500">{startTime} - {endTime} น.</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col gap-0.5 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">หัวข้อการจอง</span>
+                                        <span className="text-base font-bold dark:text-white">{title}</span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="flex flex-col gap-0.5 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">จำนวนผู้ร่วม</span>
+                                            <span className="text-base font-bold dark:text-white">{guestCount} คน</span>
+                                        </div>
+                                        <div className="flex flex-col gap-0.5 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">ผู้ขอใช้</span>
+                                            <span className="text-base font-bold dark:text-white truncate">{currentUser.name}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col gap-0.5 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">วัตถุประสงค์</span>
+                                        <span className="text-sm font-medium dark:text-slate-200 leading-relaxed whitespace-pre-wrap">{purpose}</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+                    )}
+                </div>
 
-                    </div>
-
-                    <div className="sticky bottom-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:pb-1 border-t dark:border-slate-800 mt-2">
+                <div className="sticky bottom-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl px-8 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-8 border-t border-slate-100 dark:border-slate-800 flex gap-4">
+                    {step > 1 && (
                         <button
-                            type="submit"
-                            disabled={loading || !!validate()}
-                            className="group w-full bg-slate-900 dark:bg-indigo-600 text-white rounded-2xl py-3.5 font-black text-sm transition-all hover:scale-[1.01] active:scale-[0.98] disabled:opacity-40 flex items-center justify-center gap-2 shadow-lg"
+                            type="button"
+                            onClick={prevStep}
+                            className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-[1.5rem] py-5 font-black text-lg transition-all hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-[0.98]"
+                        >
+                            ย้อนกลับ
+                        </button>
+                    )}
+
+                    {step < 3 ? (
+                        <button
+                            type="button"
+                            onClick={nextStep}
+                            className="flex-[2] bg-slate-900 dark:bg-indigo-600 text-white rounded-[1.5rem] py-5 font-black text-lg transition-all hover:scale-[1.01] active:scale-[0.98] shadow-xl shadow-indigo-500/20"
+                        >
+                            ถัดไป
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => submit()}
+                            disabled={loading}
+                            className="flex-[2] bg-indigo-600 dark:bg-indigo-500 text-white rounded-[1.5rem] py-5 font-black text-lg transition-all hover:scale-[1.01] active:scale-[0.98] disabled:opacity-40 flex items-center justify-center gap-3 shadow-xl shadow-indigo-500/30"
                         >
                             {loading ? (
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
                             ) : (
                                 <>
-                                    <Check className="w-4 h-4" />
-                                    {hasConflict ? "ถูกจองไปแล้ว" : "ยืนยันการขอใช้ห้อง"}
+                                    <Check className="w-6 h-6" />
+                                    ยืนยันการจอง
                                 </>
                             )}
                         </button>
-                    </div>
-                </form>
+                    )}
+                </div>
             </div>
             {/* Success Modal Overlay */}
             {showSuccess && (
@@ -483,6 +633,44 @@ const BookingModal: React.FC<BookingModalProps> = ({
                         >
                             ตกลง
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Alert Modal (Premium Interface) */}
+            {alertOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-8 max-w-sm w-full shadow-2xl transform animate-in zoom-in-95 slide-in-from-bottom-10 duration-300 border border-white/20 dark:border-slate-800">
+                        <div className="flex flex-col items-center text-center">
+                            <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${alertType === 'success' ? 'bg-green-100 text-green-600' :
+                                    alertType === 'error' ? 'bg-red-100 text-red-600' :
+                                        alertType === 'warning' ? 'bg-amber-100 text-amber-600' :
+                                            'bg-indigo-100 text-indigo-600'
+                                }`}>
+                                {alertType === 'success' && <Check className="w-10 h-10" />}
+                                {alertType === 'error' && <X className="w-10 h-10" />}
+                                {alertType === 'warning' && <AlertCircle className="w-10 h-10" />}
+                                {alertType === 'info' && <Check className="w-10 h-10" />}
+                            </div>
+
+                            <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-3 tracking-tight">
+                                {alertTitle}
+                            </h3>
+                            <p className="text-slate-600 dark:text-slate-400 font-medium leading-relaxed mb-8">
+                                {alertMessage}
+                            </p>
+
+                            <button
+                                onClick={() => setAlertOpen(false)}
+                                className={`w-full py-4 rounded-2xl font-bold text-white transition-all active:scale-95 shadow-lg ${alertType === 'success' ? 'bg-green-600 shadow-green-200 hover:bg-green-700' :
+                                        alertType === 'error' ? 'bg-red-600 shadow-red-200 hover:bg-red-700' :
+                                            alertType === 'warning' ? 'bg-amber-500 shadow-amber-200 hover:bg-amber-600' :
+                                                'bg-primary-600 shadow-primary-200 hover:bg-primary-700'
+                                    }`}
+                            >
+                                ตกลง
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

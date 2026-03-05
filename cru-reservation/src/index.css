@@ -243,81 +243,121 @@
     background-color: #1e293b !important;
   }
 
-  /* ===== react-date-range Calendar Dark Mode ===== */
+  /* ===== react-date-range Calendar Dark Mode & Refinement ===== */
   .dark .rdrCalendarWrapper,
   .dark .rdrDateRangeWrapper {
-    background-color: #0f172a !important;
-    /* slate-900 */
+    background-color: transparent !important;
     color: #f8fafc !important;
   }
 
-  .dark .rdrMonthAndYearWrapper {
-    background-color: #0f172a !important;
+  .rdrCalendarWrapper {
+    font-size: 16px !important;
+    width: 100% !important;
+    max-width: 420px !important;
+    margin: 0 auto !important;
+    padding: 0 10px !important;
+  }
+
+  .rdrMonth {
+    width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .rdrMonthAndYearWrapper {
+    height: 50px !important;
+    padding-top: 0 !important;
+    margin-bottom: 5px !important;
+  }
+
+  .rdrMonthAndYearPickers select {
+    font-weight: 800 !important;
+    font-size: 1.1rem !important;
+    padding: 4px 12px !important;
+    border-radius: 12px !important;
   }
 
   .dark .rdrMonthAndYearPickers select {
     background-color: #1e293b !important;
     color: #f8fafc !important;
-    border-color: #475569 !important;
+    border-color: #334155 !important;
   }
 
-  .dark .rdrMonthPicker select,
-  .dark .rdrYearPicker select {
-    background-color: #1e293b !important;
-    color: #f8fafc !important;
-  }
-
-  .dark .rdrMonth {
-    background-color: #0f172a !important;
-  }
-
-  /* Global Calendar Style - Stable */
-  .rdrCalendarWrapper {
-    background: transparent !important;
-  }
-
-  .rdrMonth {
-    padding: 0 0.25em 0.5em !important;
-  }
-
-  .rdrMonthAndYearWrapper {
-    height: 48px !important;
-    padding-top: 0 !important;
+  .rdrWeekDay {
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    font-size: 0.7rem !important;
+    padding-bottom: 10px !important;
   }
 
   .dark .rdrWeekDay {
-    color: #94a3b8 !important;
-    /* slate-400 */
+    color: #64748b !important;
+  }
+
+  .rdrDay {
+    height: 3rem !important;
+    line-height: 3rem !important;
+  }
+
+  .rdrDayNumber span {
+    font-weight: 700 !important;
+    font-size: 1.1rem !important;
   }
 
   .dark .rdrDayNumber span {
-    color: #e2e8f0 !important;
-    /* slate-200 */
+    color: #f1f5f9 !important;
   }
 
   .dark .rdrDayPassive .rdrDayNumber span {
-    color: #475569 !important;
-    /* slate-600 */
+    color: #334155 !important;
+  }
+
+  .rdrDayToday .rdrDayNumber span::after {
+    bottom: 6px !important;
+    width: 6px !important;
+    height: 6px !important;
+    background: #4f46e5 !important;
   }
 
   .dark .rdrDayToday .rdrDayNumber span::after {
     background: #818cf8 !important;
-    /* indigo-400 */
   }
 
-  .dark .rdrDay:not(.rdrDayPassive) .rdrInRange~.rdrDayNumber span,
-  .dark .rdrDay:not(.rdrDayPassive) .rdrStartEdge~.rdrDayNumber span,
-  .dark .rdrDay:not(.rdrDayPassive) .rdrEndEdge~.rdrDayNumber span {
-    color: #ffffff !important;
+  /* Range Styling */
+  .rdrStartEdge,
+  .rdrEndEdge,
+  .rdrInRange {
+    top: 6px !important;
+    bottom: 6px !important;
+  }
+
+  .rdrStartEdge {
+    border-top-left-radius: 1rem !important;
+    border-bottom-left-radius: 1rem !important;
+  }
+
+  .rdrEndEdge {
+    border-top-right-radius: 1rem !important;
+    border-bottom-right-radius: 1rem !important;
+  }
+
+  .rdrInRange {
+    opacity: 0.2 !important;
   }
 
   .dark .rdrDayDisabled {
-    background-color: #0f172a !important;
+    background-color: transparent !important;
   }
 
   .dark .rdrDayDisabled .rdrDayNumber span {
-    color: #334155 !important;
-    /* slate-700 */
+    color: #1e293b !important;
+  }
+
+  .rdrNextPrevButton {
+    background: #f1f5f9 !important;
+    border-radius: 12px !important;
+    width: 36px !important;
+    height: 36px !important;
   }
 
   .dark .rdrNextPrevButton {
@@ -328,50 +368,23 @@
     background-color: #334155 !important;
   }
 
-  .dark .rdrPprevButton i {
-    border-color: transparent #94a3b8 transparent transparent !important;
+  .rdrPprevButton i {
+    border-width: 6px 8px 6px 0 !important;
+    border-color: transparent #64748b transparent transparent !important;
   }
 
-  .dark .rdrNextButton i {
-    border-color: transparent transparent transparent #94a3b8 !important;
-  }
-
-  .dark .rdrDefinedRangesWrapper,
-  .dark .rdrStaticRanges,
-  .dark .rdrStaticRange {
-    background-color: #0f172a !important;
-    border-color: #1e293b !important;
-  }
-
-  .dark .rdrStaticRange span {
-    color: #e2e8f0 !important;
-  }
-
-  .dark .rdrInputRanges {
-    background-color: #0f172a !important;
-  }
-
-  .dark .rdrInputRange input {
-    background-color: #1e293b !important;
-    color: #f8fafc !important;
-    border-color: #475569 !important;
+  .rdrNextButton i {
+    border-width: 6px 0 6px 8px !important;
+    border-color: transparent transparent transparent #64748b !important;
   }
 
   .dark .rdrDateDisplayWrapper {
     background-color: #1e293b !important;
   }
 
-  .dark .rdrDateDisplay {
-    background-color: #0f172a !important;
-  }
-
-  .dark .rdrDateDisplayItem {
-    background-color: #1e293b !important;
-    border-color: #475569 !important;
-  }
-
-  .dark .rdrDateDisplayItem input {
-    color: #f8fafc !important;
+  /* Success Modal / Notification Refinements */
+  .dark .bg-emerald-500\/10 {
+    background-color: rgba(16, 185, 129, 0.1) !important;
   }
 }
 

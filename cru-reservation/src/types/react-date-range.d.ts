@@ -26,6 +26,8 @@ declare module 'react-date-range' {
         minDate?: Date;
         maxDate?: Date;
         locale?: any;
+        disabledDates?: Date[];
+        dayContentRenderer?: (day: Date) => any;
     }
 
     export class DateRange extends Component<DateRangeProps> { }

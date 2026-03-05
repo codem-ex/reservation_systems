@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Check, X, Clock as ClockIcon, Calendar, MessageSquare, Plus, Edit2, LayoutGrid } from "lucide-react";
+import { Check, X, Clock as ClockIcon, Calendar, MessageSquare, Plus, Edit2, LayoutGrid, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 
 import { useAuth } from "../lib/auth";
@@ -16,6 +16,7 @@ type ProfileRow = {
     display_name: string | null;
     email: string | null;
     is_admin: boolean | null;
+    stage_no: number | null;
 };
 
 type RoomRow = {
@@ -110,6 +111,19 @@ const AdminDashboard = () => {
     const [timelineLoading, setTimelineLoading] = useState(false);
     const [timelineLogs, setTimelineLogs] = useState<{ id: string; stage_no: number; approver_user_id: string; decision: string; decision_note: string | null; decided_at: string }[]>([]);
 
+    // Custom Alert Modal
+    const [alertOpen, setAlertOpen] = useState(false);
+    const [alertTitle, setAlertTitle] = useState("");
+    const [alertMessage, setAlertMessage] = useState("");
+    const [alertType, setAlertType] = useState<"info" | "success" | "warning" | "error">("info");
+
+    const showCustomAlert = (title: string, message: string, type: "info" | "success" | "warning" | "error" = "info") => {
+        setAlertTitle(title);
+        setAlertMessage(message);
+        setAlertType(type);
+        setAlertOpen(true);
+    };
+
     // Quick Edit Amenities
     const [amenityEditOpen, setAmenityEditOpen] = useState(false);
     const [amenityEditText, setAmenityEditText] = useState("");
@@ -133,7 +147,7 @@ const AdminDashboard = () => {
             try {
                 const { data, error } = await supabase
                     .from("profiles")
-                    .select("id, display_name, email, is_admin")
+                    .select("id, display_name, email, is_admin, stage_no")
                     .eq("id", supabaseUser.id)
                     .maybeSingle();
 
@@ -174,7 +188,7 @@ const AdminDashboard = () => {
 
                 supabase
                     .from("profiles")
-                    .select("id,display_name,email,is_admin")
+                    .select("id,display_name,email,is_admin,stage_no")
                     .order("updated_at", { ascending: false }),
 
                 supabase
@@ -293,7 +307,6 @@ const AdminDashboard = () => {
         const pending = uiRows.filter((x) => x.r.status === "PENDING" && !processingIds.has(x.r.id));
 
         // กรองออก: รายการที่ "ตัวเรา" (ผู้นำหรือแอดมิน) เคยร่วมตัดสินใจใน Stage ปัจจุบันไปแล้ว
-        // เพื่อแก้ปัญหา "กดแล้วไม่หาย" แม้ DB trigger จะยังไม่เปลี่ยน Status/Stage
         const userId = supabaseUser?.id;
         const needsAction = pending.filter((x) => {
             if (!userId) return false;
@@ -306,13 +319,11 @@ const AdminDashboard = () => {
 
         if (isAdmin) return needsAction;
 
-        // approver: เห็นเฉพาะงานที่ chain_id มีและ stage ปัจจุบันเป็นของ user
-        return needsAction.filter((x) => {
-            if (!userId || !x.r.chain_id) return false;
-            const s = stepByChainAndStage.get(stepKey(x.r.chain_id, x.r.current_stage));
-            return !!s && s.approver_user_id === userId;
-        });
-    }, [uiRows, isAdmin, supabaseUser?.id, stepByChainAndStage, processingIds]);
+        const myProfile = profiles.find(p => p.id === userId);
+        if (myProfile?.stage_no) return needsAction;
+
+        return [];
+    }, [uiRows, isAdmin, supabaseUser?.id, processingIds, profiles]);
 
     const pastRows = useMemo(() => {
         // admin เห็น history ทั้งหมด / approver เห็น history เฉพาะที่เกี่ยวกับตัวเองก็ได้
@@ -354,61 +365,53 @@ const AdminDashboard = () => {
         if (processingIds.has(r.id)) return;
 
         try {
-            // gating (non-admin)
-            if (!isAdmin) {
-                if (!r.chain_id) {
-                    alert("ใบจองนี้ยังไม่มี chain_id (ควรถูกเติมโดย trigger ตอนสร้างคำขอ)");
-                    return;
-                }
-                const s = stepByChainAndStage.get(stepKey(r.chain_id, r.current_stage));
-                if (!s || s.approver_user_id !== supabaseUser.id) {
-                    alert("คุณไม่มีสิทธิ์อนุมัติขั้นนี้");
-                    return;
-                }
-            }
-
-            // Optimistic update: hide the row and disable buttons
+            // Optimistic update
             setProcessingIds(prev => new Set(prev).add(r.id));
 
-            await insertApprovalLog({
-                reservation_id: r.id,
-                chain_id: r.chain_id,
-                stage_no: r.current_stage,
-                approver_user_id: supabaseUser.id,
-                decision: "APPROVED",
+            // เรียกใช้ Database RPC (Ultimate Fix) - ทำงานแบบ Atomic Transaction ในตัว DB เอง
+            const { data, error: rpcError } = await supabase.rpc('approve_reservation_v2', {
+                p_reservation_id: r.id,
+                p_approver_id: supabaseUser.id
             });
 
-            // ✅ Notify the requester about the approval
+            if (rpcError) throw rpcError;
+
+            // ตรวจสอบผลลัพธ์จาก RPC (JSONB: success, message, final)
+            const result = data as { success: boolean, message: string, final?: boolean };
+
+            if (!result.success) {
+                showCustomAlert("การดำเนินการไม่สำเร็จ", result.message, "warning");
+                await loadAll(); // รีโหลดข้อมูลล่าสุดเพื่อให้หน้าจอตรงกับความจริง
+                setProcessingIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(r.id);
+                    return next;
+                });
+                return;
+            }
+
+            // หากสำเร็จ -> ดำเนินการขั้นตอนถัดไป (Notify / Sync)
+            const isFullyApproved = result.final;
             const requesterId = r.requester_id;
             const roomName = row.room?.name || "ห้องประชุม";
 
-            // Check if this was the final stage or if it's still pending
-            const { data: updatedRes } = await supabase
-                .from("reservations")
-                .select("status, current_stage")
-                .eq("id", r.id)
-                .single();
-
-            const isFullyApproved = updatedRes?.status === "APPROVED";
-            console.log(`[Debug Sync] Reservation ID: ${r.id}, Status: ${updatedRes?.status}, IsFullyApproved: ${isFullyApproved}`);
-
-            // ✅ If fully approved, sync to Google Calendar (Option B)
+            // ✅ If fully approved, sync to Google Calendar
             if (isFullyApproved) {
-                console.log("[Debug Sync] Attempting to sync to Google Calendar...");
+                console.log("[Debug Sync] Transactional Sync to Google Calendar...");
                 try {
-                    const syncResult = await createGoogleCalendarEvent({
+                    await createGoogleCalendarEvent({
                         summary: `[จองห้อง] ${row.room?.name || "ห้องประชุม"} - ${r.title}`,
                         location: row.room?.location || "",
-                        description: `ผู้จอง: ${row.requester?.display_name || "ไม่ระบุชื่อ"}\nวัตถุประสงค์: ${r.purpose}\nสถานะ: อนุมัติแล้วผ่านระบบ`,
+                        description: `ผู้จอง: ${row.requester?.display_name || "ไม่ระบุชื่อ"}\nวัตถุประสงค์: ${r.purpose}\nสถานะ: อนุมัติครบถ้วน (ผ่านระบบ Guard)`,
                         startISO: r.start_at,
                         endISO: r.end_at,
                     });
-                    console.log("[Debug Sync] Google Calendar Sync Success:", syncResult);
                 } catch (err) {
                     console.error("[Debug Sync] Google Calendar Sync Error:", err);
                 }
             }
 
+            // ✅ แจ้งเตือนผู้จอง (อิงตามสถานะสเตจที่อัปเดตแล้วใน DB)
             await supabase.from("notifications").insert({
                 user_id: requesterId,
                 title: isFullyApproved ? "คำขอจองห้องได้รับการอนุมัติแล้ว" : `คำขอจองห้องผ่านการอนุมัติขั้นที่ ${r.current_stage}`,
@@ -419,7 +422,8 @@ const AdminDashboard = () => {
                 is_read: false
             });
 
-            // Small delay to allow DB triggers to finish updating reservation status
+            showCustomAlert("สำเร็จ", result.message, "success");
+
             setTimeout(async () => {
                 await loadAll();
                 setProcessingIds(prev => {
@@ -427,14 +431,9 @@ const AdminDashboard = () => {
                     next.delete(r.id);
                     return next;
                 });
-            }, 2000);
+            }, 500);
         } catch (e: any) {
-            if (e.message?.includes("uq_ra_resv_stage_approver")) {
-                alert("รายการนี้ได้รับการดำเนินการไปก่อนหน้านี้แล้ว ระบบจะอัปเดตข้อมูลให้ใหม่");
-                loadAll();
-            } else {
-                alert("เกิดข้อผิดพลาด: " + e.message);
-            }
+            showCustomAlert("เกิดข้อผิดพลาด", e.message, "error");
             setProcessingIds(prev => {
                 const next = new Set(prev);
                 next.delete(r.id);
@@ -456,22 +455,17 @@ const AdminDashboard = () => {
 
         const reason = rejectReason.trim();
         if (!reason) {
-            alert("กรุณาระบุเหตุผลการปฏิเสธ");
+            showCustomAlert("ระบุเหตุผล", "กรุณาระบุเหตุผลการปฏิเสธเพื่อให้ผู้จองทราบ", "warning");
             return;
         }
 
         try {
-            // gating (non-admin)
-            if (!isAdmin) {
-                if (!r.chain_id) {
-                    alert("ใบจองนี้ยังไม่มี chain_id (ควรถูกเติมโดย trigger ตอนสร้างคำขอ)");
-                    return;
-                }
-                const s = stepByChainAndStage.get(stepKey(r.chain_id, r.current_stage));
-                if (!s || s.approver_user_id !== supabaseUser.id) {
-                    alert("คุณไม่มีสิทธิ์ปฏิเสธขั้นนี้");
-                    return;
-                }
+            const myProfile = profiles.find(p => p.id === supabaseUser.id);
+            const isMyTurn = myProfile?.stage_no ? (myProfile.stage_no === r.current_stage) : isAdmin;
+
+            if (!isMyTurn) {
+                showCustomAlert("ไม่สามารถปฏิเสธได้", "ยังไม่ถึงลำดับการจัดการขั้นตอนของคุณ", "warning");
+                return;
             }
 
             // Optimistic update: hide the row and disable buttons
@@ -519,11 +513,11 @@ const AdminDashboard = () => {
             }, 2000);
         } catch (e: any) {
             if (e.message?.includes("uq_ra_resv_stage_approver")) {
-                alert("รายการนี้ได้รับการดำเนินการไปก่อนหน้านี้แล้ว ระบบจะอัปเดตข้อมูลให้ใหม่");
+                showCustomAlert("ข้อมูลซ้ำ", "รายการนี้ได้รับการดำเนินการไปก่อนหน้านี้แล้ว ระบบจะอัปเดตข้อมูลให้ใหม่", "info");
                 setRejectOpen(false);
                 loadAll();
             } else {
-                alert("เกิดข้อผิดพลาด: " + e.message);
+                showCustomAlert("เกิดข้อผิดพลาด", e.message, "error");
             }
             setProcessingIds(prev => {
                 const next = new Set(prev);
@@ -745,9 +739,6 @@ const AdminDashboard = () => {
                                         const approverProfile =
                                             currentStep ? profileById.get(currentStep.approver_user_id) : null;
 
-                                        const canAct =
-                                            isAdmin ||
-                                            (!!currentStep && currentStep.approver_user_id === supabaseUser.id);
 
                                         return (
                                             <div
@@ -763,8 +754,25 @@ const AdminDashboard = () => {
                                                         </span>
                                                         <span className="text-gray-400 dark:text-slate-500">•</span>
                                                         <span className="text-xs bg-slate-100 dark:bg-slate-800 dark:text-slate-300 px-2 py-0.5 rounded">
-                                                            Stage {r.current_stage}
+                                                            ขั้นที่ {r.current_stage}
                                                         </span>
+
+                                                        <div className="flex items-center gap-1 ml-2">
+                                                            {(() => {
+                                                                const chainSteps = steps.filter(s => s.chain_id === r.chain_id);
+                                                                const totalS = chainSteps.length > 0 ? Math.max(...chainSteps.map(s => s.stage_no)) : 2;
+
+                                                                return Array.from({ length: totalS }, (_, i) => i + 1).map(sNum => (
+                                                                    <div key={sNum} className="flex items-center">
+                                                                        <div className={`w-2 h-2 rounded-full ${r.current_stage >= sNum ? 'bg-green-500 shadow-sm shadow-green-200' : 'bg-slate-300'}`}></div>
+                                                                        <span className={`text-[9px] ml-1 mr-1 ${r.current_stage === sNum ? 'font-black text-primary-600' : 'text-slate-400 font-bold'}`}>
+                                                                            สเตจ {sNum}
+                                                                        </span>
+                                                                        {sNum < totalS && <div className="w-2 h-[1px] bg-slate-200 mr-1"></div>}
+                                                                    </div>
+                                                                ));
+                                                            })()}
+                                                        </div>
 
                                                         {approverProfile && (
                                                             <span className="text-xs bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 px-2 py-0.5 rounded border border-indigo-100 dark:border-indigo-800/50">
@@ -807,25 +815,35 @@ const AdminDashboard = () => {
                                                 </div>
 
                                                 <div className="flex gap-2">
-                                                    <button
-                                                        disabled={!canAct || processingIds.has(r.id)}
-                                                        onClick={() => approve(row)}
-                                                        className={`flex items-center px-4 py-2 rounded-lg transition ${canAct && !processingIds.has(r.id) ? "bg-green-600 text-white hover:bg-green-700" : "bg-slate-200 text-slate-500 cursor-not-allowed"
-                                                            }`}
-                                                    >
-                                                        <Check className="w-4 h-4 mr-2" />
-                                                        {processingIds.has(r.id) ? "กำลังบันทึก..." : "อนุมัติ"}
-                                                    </button>
+                                                    {(() => {
+                                                        const myProfile = profiles.find(p => p.id === supabaseUser.id);
+                                                        const isMyTurn = myProfile?.stage_no ? (myProfile.stage_no === r.current_stage) : isAdmin;
+                                                        const isWait = !isMyTurn && myProfile?.stage_no && r.current_stage !== myProfile.stage_no;
 
-                                                    <button
-                                                        disabled={!canAct || processingIds.has(r.id)}
-                                                        onClick={() => openReject(row)}
-                                                        className={`flex items-center px-4 py-2 rounded-lg transition ${canAct && !processingIds.has(r.id) ? "bg-red-100 text-red-700 hover:bg-red-200" : "bg-slate-200 text-slate-500 cursor-not-allowed"
-                                                            }`}
-                                                    >
-                                                        <X className="w-4 h-4 mr-2" />
-                                                        ปฏิเสธ
-                                                    </button>
+                                                        return (
+                                                            <>
+                                                                <button
+                                                                    disabled={!isMyTurn || processingIds.has(r.id)}
+                                                                    onClick={() => approve(row)}
+                                                                    className={`flex items-center px-4 py-2 rounded-lg transition ${isMyTurn && !processingIds.has(r.id) ? "bg-green-600 text-white hover:bg-green-700" : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                                                                        }`}
+                                                                >
+                                                                    <Check className="w-4 h-4 mr-2" />
+                                                                    {isWait ? `รอสเตจ ${r.current_stage}` : processingIds.has(r.id) ? "กำลังบันทึก..." : "อนุมัติ"}
+                                                                </button>
+
+                                                                <button
+                                                                    disabled={!isMyTurn || processingIds.has(r.id)}
+                                                                    onClick={() => openReject(row)}
+                                                                    className={`flex items-center px-4 py-2 rounded-lg transition ${isMyTurn && !processingIds.has(r.id) ? "bg-red-100 text-red-700 hover:bg-red-200" : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                                                                        }`}
+                                                                >
+                                                                    <X className="w-4 h-4 mr-2" />
+                                                                    ปฏิเสธ
+                                                                </button>
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </div>
                                         );
@@ -1227,18 +1245,22 @@ const AdminDashboard = () => {
             {amenityEditOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 max-w-md w-full shadow-2xl transform animate-in zoom-in-95 duration-200 border dark:border-slate-800">
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">แก้ไขอุปกรณ์ภายในห้อง</h3>
-                        <p className="text-xs text-slate-500 mb-2">ใส่รายการอุปกรณ์หนึ่งรายการต่อหนึ่งบรรทัด</p>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                            <Edit2 className="w-5 h-5 text-primary-500" />
+                            แก้ไขอุปกรณ์ภายในห้อง
+                        </h3>
+                        <p className="text-xs text-slate-500 mb-2 font-medium uppercase tracking-wider">ใส่รายการอุปกรณ์หนึ่งรายการต่อหนึ่งบรรทัด</p>
                         <textarea
                             value={amenityEditText}
                             onChange={(e) => setAmenityEditText(e.target.value)}
                             rows={8}
-                            className="w-full p-4 border rounded-2xl dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none mb-6"
+                            className="w-full p-4 border rounded-2xl dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none mb-6 font-medium transition-all"
+                            placeholder="เช่น: ไมโครโฟนไร้สาย 2 ตัว"
                         />
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setAmenityEditOpen(false)}
-                                className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                                className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
                             >
                                 ยกเลิก
                             </button>
@@ -1247,9 +1269,47 @@ const AdminDashboard = () => {
                                     const lines = amenityEditText.split('\n').map(l => l.trim()).filter(Boolean);
                                     if (amenityEditTarget) updateRoomAmenities(amenityEditTarget, lines);
                                 }}
-                                className="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-primary-200 dark:shadow-none"
+                                className="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-primary-200 dark:shadow-none active:scale-95"
                             >
                                 บันทึก
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Alert Modal (Premium Interface) */}
+            {alertOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-8 max-w-sm w-full shadow-2xl transform animate-in zoom-in-95 slide-in-from-bottom-10 duration-300 border border-white/20 dark:border-slate-800">
+                        <div className="flex flex-col items-center text-center">
+                            <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${alertType === 'success' ? 'bg-green-100 text-green-600' :
+                                alertType === 'error' ? 'bg-red-100 text-red-600' :
+                                    alertType === 'warning' ? 'bg-amber-100 text-amber-600' :
+                                        'bg-indigo-100 text-indigo-600'
+                                }`}>
+                                {alertType === 'success' && <Check className="w-10 h-10" />}
+                                {alertType === 'error' && <X className="w-10 h-10" />}
+                                {alertType === 'warning' && <AlertCircle className="w-10 h-10" />}
+                                {alertType === 'info' && <MessageSquare className="w-10 h-10" />}
+                            </div>
+
+                            <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-3 tracking-tight">
+                                {alertTitle}
+                            </h3>
+                            <p className="text-slate-600 dark:text-slate-400 font-medium leading-relaxed mb-8">
+                                {alertMessage}
+                            </p>
+
+                            <button
+                                onClick={() => setAlertOpen(false)}
+                                className={`w-full py-4 rounded-2xl font-bold text-white transition-all active:scale-95 shadow-lg ${alertType === 'success' ? 'bg-green-600 shadow-green-200 hover:bg-green-700' :
+                                    alertType === 'error' ? 'bg-red-600 shadow-red-200 hover:bg-red-700' :
+                                        alertType === 'warning' ? 'bg-amber-500 shadow-amber-200 hover:bg-amber-600' :
+                                            'bg-primary-600 shadow-primary-200 hover:bg-primary-700'
+                                    }`}
+                            >
+                                ตกลง
                             </button>
                         </div>
                     </div>
