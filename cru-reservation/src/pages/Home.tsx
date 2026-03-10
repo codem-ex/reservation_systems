@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Search, CalendarDays, Clock } from "lucide-react";
 
 import { getRooms, getBookings, getCurrentUser } from "../services/storage";
@@ -16,6 +16,16 @@ type ProfileLite = {
 };
 
 const Home = () => {
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        const hasSeenGuide = localStorage.getItem("has_seen_user_guide");
+        if (!hasSeenGuide) {
+            // Set flag immediately so they can navigate back to home if they want
+            localStorage.setItem("has_seen_user_guide", "true");
+            navigate("/help");
+        }
+    }, [navigate]);
     /* ===============================
        Supabase Session
     =============================== */

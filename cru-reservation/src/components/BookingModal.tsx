@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { X, User as UserIcon, Check, Users, AlertCircle } from "lucide-react";
+import { X, User as UserIcon, Check, Users, AlertCircle, ChevronDown } from "lucide-react";
 
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -149,7 +149,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
     /* ===== form ===== */
     const [title, setTitle] = useState("");
     const [purpose, setPurpose] = useState("");
-    const [guestCount, setGuestCount] = useState<number | string>(1);
+    const [guestCount, setGuestCount] = useState<number>(1);
 
 
 
@@ -268,7 +268,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
         if (s === 2) {
             if (!title.trim()) return "กรุณาระบุหัวข้อการขอใช้ห้องประชุม";
             if (!purpose.trim()) return "กรุณาระบุวัตถุประสงค์การใช้งาน";
-            if (!guestCount || Number(guestCount) < 1) return "กรุณาระบุจำนวนผู้ร่วมอย่างน้อย 1 คน";
+            if (!guestCount || guestCount < 1) return "กรุณาระบุจำนวนผู้ร่วมอย่างน้อย 1 คน";
+            if (guestCount > room.capacity) return `ห้องนี้รองรับได้สูงสุด ${room.capacity} คน`;
         }
 
         return "";
@@ -300,7 +301,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 title: title.trim(),
                 purpose: [
                     purpose.trim(),
-                    Number(guestCount) > 1 ? `\n(จำนวนผู้เข้าร่วม: ${guestCount} คน)` : "",
+                    guestCount > 1 ? `\n(จำนวนผู้เข้าร่วม: ${guestCount} คน)` : "",
                 ].filter(Boolean).join("\n"),
 
                 start_at: buildISO(useStart, startTime),
@@ -358,24 +359,24 @@ const BookingModal: React.FC<BookingModalProps> = ({
     return (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-300">
             <div className="w-full max-w-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20 dark:border-slate-800/50 flex flex-col max-h-[95dvh] sm:max-h-[90vh] animate-in zoom-in-95 duration-300">
-                <div className="bg-slate-900 dark:bg-black px-5 py-5 relative border-b border-white/5">
+                <div className="bg-slate-50 dark:bg-slate-950 px-5 py-5 relative border-b border-slate-100 dark:border-white/5">
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
-                            <h2 className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1.5 leading-none">แบบคำขอใช้ห้องประชุม</h2>
+                            <h2 className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] mb-1.5 leading-none">แบบคำขอใช้ห้องประชุม</h2>
                             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                                <h1 className="text-lg sm:text-xl font-black text-white tracking-tight truncate shrink-0">{room.name}</h1>
+                                <h1 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight truncate shrink-0">{room.name}</h1>
 
                                 {/* Requester Profile Badge - Compact */}
-                                <div className="flex items-center gap-2 bg-white/5 p-1.5 px-2.5 rounded-lg border border-white/5 backdrop-blur-md self-start sm:self-auto">
+                                <div className="flex items-center gap-2 bg-slate-200/50 dark:bg-white/5 p-1.5 px-2.5 rounded-lg border border-slate-200 dark:border-white/5 backdrop-blur-md self-start sm:self-auto">
                                     <div className="w-5 h-5 rounded bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
                                         <UserIcon className="text-white w-2.5 h-2.5" />
                                     </div>
-                                    <div className="text-[10px] font-bold text-white leading-none">{currentUser.name}</div>
+                                    <div className="text-[10px] font-bold text-slate-900 dark:text-white leading-none">{currentUser.name}</div>
                                 </div>
                             </div>
                         </div>
-                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors shrink-0">
-                            <X className="w-5 h-5 text-white/40 hover:text-white" />
+                        <button onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-full transition-colors shrink-0">
+                            <X className="w-5 h-5 text-slate-400 dark:text-white/40 hover:text-slate-600 dark:hover:text-white" />
                         </button>
                     </div>
                 </div>
@@ -428,11 +429,17 @@ const BookingModal: React.FC<BookingModalProps> = ({
                                         rangeColors={["#4f46e5", "#f59e0b"]}
                                         minDate={startOfDay(new Date())}
                                         disabledDates={disabledDates}
+                                        // @ts-ignore
+                                        dragSelectionEnabled={true}
+                                        // @ts-ignore
+                                        moveRangeOnFirstSelection={false}
+                                        // @ts-ignore
+                                        preventSnapRefocus={true}
                                         dayContentRenderer={(day: Date) => {
                                             const dateStr = dayjs(day).format('YYYY-MM-DD');
                                             const isBusy = busyDateStrings.has(dateStr);
                                             return (
-                                                <div className="relative w-full h-full flex flex-col items-center justify-center group/day">
+                                                <div className="relative w-full h-full flex flex-col items-center justify-center group/day pointer-events-none">
                                                     <span className={`z-10 ${isBusy ? 'opacity-50' : ''}`}>{day.getDate()}</span>
                                                     {isBusy && (
                                                         <div
@@ -495,15 +502,19 @@ const BookingModal: React.FC<BookingModalProps> = ({
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">จำนวนผู้ร่วม (คน)</label>
                                     <div className="relative">
-                                        <input
-                                            type="number"
-                                            min={1}
+                                        <select
                                             value={guestCount}
-                                            onFocus={(e) => e.target.select()}
-                                            onChange={(e) => setGuestCount(e.target.value === "" ? "" : Number(e.target.value))}
-                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-11 py-2.5 text-lg font-black text-slate-800 dark:text-white focus:border-indigo-500 focus:bg-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none shadow-sm"
-                                        />
-                                        <Users className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                            onChange={(e) => setGuestCount(Number(e.target.value))}
+                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-11 py-2.5 text-lg font-black text-slate-800 dark:text-white focus:border-indigo-500 focus:bg-white outline-none appearance-none shadow-sm cursor-pointer"
+                                        >
+                                            {[...Array(room.capacity || 50)].map((_, i) => (
+                                                <option key={i + 1} value={i + 1}>
+                                                    {i + 1} คน
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <Users className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                        <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
                                     </div>
                                 </div>
 
@@ -643,9 +654,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-8 max-w-sm w-full shadow-2xl transform animate-in zoom-in-95 slide-in-from-bottom-10 duration-300 border border-white/20 dark:border-slate-800">
                         <div className="flex flex-col items-center text-center">
                             <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${alertType === 'success' ? 'bg-green-100 text-green-600' :
-                                    alertType === 'error' ? 'bg-red-100 text-red-600' :
-                                        alertType === 'warning' ? 'bg-amber-100 text-amber-600' :
-                                            'bg-indigo-100 text-indigo-600'
+                                alertType === 'error' ? 'bg-red-100 text-red-600' :
+                                    alertType === 'warning' ? 'bg-amber-100 text-amber-600' :
+                                        'bg-indigo-100 text-indigo-600'
                                 }`}>
                                 {alertType === 'success' && <Check className="w-10 h-10" />}
                                 {alertType === 'error' && <X className="w-10 h-10" />}
@@ -663,9 +674,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
                             <button
                                 onClick={() => setAlertOpen(false)}
                                 className={`w-full py-4 rounded-2xl font-bold text-white transition-all active:scale-95 shadow-lg ${alertType === 'success' ? 'bg-green-600 shadow-green-200 hover:bg-green-700' :
-                                        alertType === 'error' ? 'bg-red-600 shadow-red-200 hover:bg-red-700' :
-                                            alertType === 'warning' ? 'bg-amber-500 shadow-amber-200 hover:bg-amber-600' :
-                                                'bg-primary-600 shadow-primary-200 hover:bg-primary-700'
+                                    alertType === 'error' ? 'bg-red-600 shadow-red-200 hover:bg-red-700' :
+                                        alertType === 'warning' ? 'bg-amber-500 shadow-amber-200 hover:bg-amber-600' :
+                                            'bg-primary-600 shadow-primary-200 hover:bg-primary-700'
                                     }`}
                             >
                                 ตกลง

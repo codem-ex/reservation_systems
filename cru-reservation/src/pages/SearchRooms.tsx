@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Calendar as CalendarIcon, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
 import RoomCard from "../components/RoomCard";
@@ -46,15 +46,7 @@ function isReservationBlocking(status: string) {
     return true; // PENDING / APPROVED / อื่น ๆ ให้บล็อก
 }
 
-function toSearchBlob(r: DbRoom) {
-    return [
-        r.name ?? "",
-        r.location ?? "",
-        r.description ?? "",
-    ]
-        .join(" ")
-        .toLowerCase();
-}
+
 
 function toLegacyRoom(r: DbRoom): any {
     // adapter ให้ RoomCard ใช้ได้ (เพราะ types เดิมมาจาก mock)
@@ -79,7 +71,6 @@ function toLegacyRoom(r: DbRoom): any {
 const SearchRooms = () => {
     const { user, loading: authLoading } = useAuth();
 
-    const [searchTerm, setSearchTerm] = useState("");
     const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
     const [startTime, setStartTime] = useState("09:00");
     const [endTime, setEndTime] = useState("10:00");
@@ -140,25 +131,19 @@ const SearchRooms = () => {
         if (isNaN(+searchStart) || isNaN(+searchEnd)) return [];
         if (searchEnd <= searchStart) return [];
 
-        const term = searchTerm.trim().toLowerCase();
-
         return rooms
             .filter((room) => {
-                // 1) search text: name/location/description
-                const blob = toSearchBlob(room);
-                const matchesSearch = term === "" ? true : blob.includes(term);
-
-                // 2) capacity
+                // 1) capacity
                 const matchesCapacity = Number(room.capacity) >= Number(minCapacity);
 
-                // 3) is_active
+                // 2) is_active
                 const isActive = room.is_active === true;
 
-                // 4) amenities filter
+                // 3) amenities filter
                 const matchesAmenities = selectedAmenities.length === 0 ||
                     selectedAmenities.every(a => Array.isArray(room.amenities) && room.amenities.includes(a));
 
-                return matchesSearch && matchesCapacity && isActive && matchesAmenities;
+                return matchesCapacity && isActive && matchesAmenities;
             })
             .map((room) => {
                 const legacy = toLegacyRoom(room);
@@ -181,7 +166,7 @@ const SearchRooms = () => {
 
                 return legacy;
             });
-    }, [rooms, reservations, searchTerm, minCapacity, selectedDate, startTime, endTime, selectedAmenities]);
+    }, [rooms, reservations, minCapacity, selectedDate, startTime, endTime, selectedAmenities]);
 
     const handleBook = (room: any) => setSelectedRoom(room);
     const handleCloseModal = () => setSelectedRoom(null);
@@ -213,18 +198,6 @@ const SearchRooms = () => {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">ค้นหาห้องประชุม</h1>
-
-                {/* Search Bar */}
-                <div className="relative w-full md:w-96">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                        type="text"
-                        placeholder="ค้นหาตามชื่อ / สถานที่ / รายละเอียด..."
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
             </div>
 
             {/* Filters */}

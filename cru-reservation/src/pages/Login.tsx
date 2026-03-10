@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { User as UserIcon, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 
 /*
@@ -137,8 +137,8 @@ const Login: React.FC = () => {
 
                 {/* Header */}
                 <div className="text-center mb-8">
-                    <div className="bg-primary-500/20 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-primary-500/30">
-                        <UserIcon className="w-10 h-10 text-primary-400" />
+                    <div className="bg-white/90 dark:bg-slate-800 w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl border border-white/20 dark:border-slate-700 p-3">
+                        <img src="/logo.png" alt="CRU Logo" className="w-full h-full object-contain" />
                     </div>
 
                     <h1 className="text-3xl font-bold text-white mb-2">

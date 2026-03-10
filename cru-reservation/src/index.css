@@ -250,6 +250,27 @@
     color: #f8fafc !important;
   }
 
+  /* Fix for mobile dragging in react-date-range */
+  .rdrCalendarWrapper,
+  .rdrDateRangeWrapper {
+    touch-action: manipulation !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+  }
+
+  .rdrDay {
+    touch-action: manipulation !important;
+  }
+
+  /* Ensure day button itself is reachable */
+  .rdrDayNumber {
+    pointer-events: none !important;
+  }
+
+  .rdrDay:not(.rdrDayDisabled) {
+    cursor: pointer !important;
+  }
+
   .rdrCalendarWrapper {
     font-size: 16px !important;
     width: 100% !important;
@@ -385,6 +406,64 @@
   /* Success Modal / Notification Refinements */
   .dark .bg-emerald-500\/10 {
     background-color: rgba(16, 185, 129, 0.1) !important;
+  }
+
+  /* Custom Scrollbar for Notification Dropdown */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.2);
+    border-radius: 10px;
+  }
+
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Bell Ring Animation */
+  @keyframes bell-ring {
+    0% {
+      transform: rotate(0);
+    }
+
+    10% {
+      transform: rotate(15deg);
+    }
+
+    20% {
+      transform: rotate(-15deg);
+    }
+
+    30% {
+      transform: rotate(10deg);
+    }
+
+    40% {
+      transform: rotate(-10deg);
+    }
+
+    50% {
+      transform: rotate(5deg);
+    }
+
+    60% {
+      transform: rotate(-5deg);
+    }
+
+    100% {
+      transform: rotate(0);
+    }
+  }
+
+  .animate-bell {
+    animation: bell-ring 0.6s ease-in-out;
+    transform-origin: top center;
   }
 }
 

@@ -5,7 +5,8 @@
   "homepage": "https://AyaEmorin.github.io/reservation_systems/",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "npx infisical run -- vite",
+    "dev:local": "vite",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
     "build": "tsc -b && vite build",
@@ -33,6 +34,7 @@
     "react": "^19.2.0",
     "react-date-range": "^2.0.1",
     "react-dom": "^19.2.0",
+    "react-hot-toast": "^2.6.0",
     "react-router-dom": "^6.28.0",
     "tailwind-merge": "^3.4.0",
     "three": "^0.182.0",

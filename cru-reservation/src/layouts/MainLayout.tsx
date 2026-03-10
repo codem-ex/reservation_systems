@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { LayoutDashboard, Search, CalendarDays, LogOut, Moon, Sun, Settings, HelpCircle, Menu, X } from "lucide-react";
 import NotificationBell from "../components/NotificationBell";
-import AppParticles from "../components/AppParticles";
 
 import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabaseClient";
@@ -89,8 +88,6 @@ export default function MainLayout() {
     return (
         // ✅ Keep original overflow-hidden and h-screen
         <div className="h-screen supports-[height:100dvh]:h-[100dvh] relative text-slate-900 dark:text-slate-100 overflow-hidden transition-colors duration-300 flex flex-col">
-            {/* 3D Background Particles */}
-            <AppParticles />
 
             {/* Mobile Navbar - Visible only on mobile */}
             <div className="md:hidden flex items-center justify-between px-4 h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50">
@@ -101,10 +98,10 @@ export default function MainLayout() {
                     >
                         <Menu className="w-6 h-6" />
                     </button>
-                    <span className="font-bold text-primary-700 dark:text-primary-400">CRU RESERVE</span>
+                    {/* Branding removed as per user request */}
                 </div>
                 <div className="flex items-center gap-2">
-                    <NotificationBell userId={supabaseUser?.id || ""} />
+                    <NotificationBell userId={supabaseUser?.id || ""} direction="down" />
                 </div>
             </div>
 
@@ -127,15 +124,17 @@ export default function MainLayout() {
                     <div className="flex flex-col h-full w-full">
                         {/* Brand (Mobile Header with Safe Area) */}
                         <div className="p-6 pt-[calc(1.5rem+env(safe-area-inset-top))] flex items-start justify-between">
-                            <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="block hover:opacity-80 transition-opacity group">
-                                <div className="text-2xl font-extrabold text-primary-700 leading-tight group-hover:text-primary-600 transition-colors">
-                                    ระบบจองห้อง
-                                    <br />
-                                    ประชุม
-                                </div>
-                                <div className="text-sm text-slate-500 mt-2">
-                                    มหาวิทยาลัยราชภัฏจันทรเกษม
-                                </div>
+                            <Link
+                                to="/"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="flex flex-col hover:opacity-80 transition-opacity active:scale-[0.98] group"
+                            >
+                                <h1 className="text-xl font-extrabold text-primary-700 dark:text-primary-400 leading-tight group-hover:text-primary-600 transition-colors">
+                                    ระบบจองห้องประชุม
+                                </h1>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium tracking-wide uppercase">
+                                    Faculty of Education CRU
+                                </p>
                             </Link>
 
                             {/* Close button for mobile drawer */}
@@ -192,7 +191,7 @@ export default function MainLayout() {
 
                             {/* Show bell here only on desktop; mobile has it in Top Navbar */}
                             <div className="hidden md:block">
-                                <NotificationBell userId={supabaseUser?.id || ""} />
+                                <NotificationBell userId={supabaseUser?.id || ""} direction="up" />
                             </div>
                         </div>
 

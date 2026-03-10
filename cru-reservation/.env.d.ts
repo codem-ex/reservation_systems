@@ -1,11 +1,9 @@
-/// <reference types="vite/client" />
+# Supabase (public keys for frontend)
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
 
-interface ImportMetaEnv {
-  readonly VITE_SUPABASE_URL: string;
-  readonly VITE_SUPABASE_ANON_KEY: string;
-  readonly VITE_AUTH_REDIRECT_URL?: string;
-}
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
-}
+# Optional: where to redirect after OAuth
+VITE_AUTH_REDIRECT_URL="http://localhost:3000"
+VITE_GOOGLE_API_KEY = 
+VITE_GOOGLE_CALENDAR_ID = 
+VITE_GOOGLE_SCRIPT_URL=
