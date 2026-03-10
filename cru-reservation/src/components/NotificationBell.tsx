@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
-import { toast } from "react-hot-toast";
 
 type Notification = {
     id: string;
@@ -76,97 +75,64 @@ const NotificationBell = ({ userId, direction = "down" }: { userId: string, dire
     };
 
     useEffect(() => {
-        if (userId) {
-            console.log(`🔔 [Realtime] เริ่มต้นการเชื่อมต่อสำหรับ User: ${userId} (${direction})`);
-            fetchNotifications();
-
-            const channel = supabase
-                .channel(`realtime-notifications-${userId}-${direction}`) // Unique name for each instance
-                .on('postgres_changes', {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'notifications'
-                    // นำ filter ออกแล้วเช็คใน Code แทนเพื่อความแม่นยำ (RLS จะคุมความปลอดภัยให้เอง)
-                }, (payload) => {
-                    console.log("⚡ [Realtime] พัสดุมาถึงแล้ว (Raw Payload):", payload);
-                    const newNotif = payload.new as Notification;
-
-                    if (!newNotif) {
-                        console.warn("⚠️ [Realtime] ข้อมูลที่ส่งมาว่างเปล่า (Empty Payload)");
-                        return;
-                    }
-
-                    // เช็คว่าเป็นการแจ้งเตือนของเราจริงไหม
-                    if (newNotif.user_id !== userId) {
-                        console.log(`⏭️ [Realtime] ข้ามแจ้งเตือนนี้ (ไม่ใช่ของเรา) -> Target: ${newNotif.user_id}, Current: ${userId}`);
-                        return;
-                    }
-
-                    console.log("🚀 [Realtime] ตรวจพบแจ้งเตือนใหม่สำหรับเรา!", newNotif);
-
-                    // 1. เล่นเสียงแจ้งเตือน
-                    try {
-                        const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3");
-                        audio.volume = 0.6;
-                        const playPromise = audio.play();
-                        if (playPromise !== undefined) {
-                            playPromise.catch(e => console.warn("🔊 เล่นเสียงไม่ได้ (ติด Browser Autoplay):", e));
-                        }
-                    } catch (err) {
-                        console.error("🔊 Audio Error:", err);
-                    }
-
-                    // 2. กระดิ่งสั่น
-                    setIsShaking(false);
-                    setTimeout(() => {
-                        setIsShaking(true);
-                        setTimeout(() => setIsShaking(false), 800);
-                    }, 10);
-
-                    // 3. แสดง Toast เด้งขึ้นมา
-                    toast.success(
-                        (t) => (
-                            <div className="flex flex-col gap-1 cursor-pointer pr-4" onClick={() => {
-                                toast.dismiss(t.id);
-                                handleNotificationClick(newNotif);
-                            }}>
-                                <span className="font-bold text-sm text-slate-900">{newNotif.title}</span>
-                                <span className="text-xs text-slate-600 line-clamp-2">{newNotif.message}</span>
-                            </div>
-                        ),
-                        {
-                            duration: 6000,
-                            icon: <Bell className="w-5 h-5 text-indigo-500 animate-bounce" />,
-                            style: {
-                                borderRadius: '16px',
-                                background: '#fff',
-                                border: '1px solid #e2e8f0',
-                                padding: '16px',
-                                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                            }
-                        }
-                    );
-
-                    fetchNotifications();
-                })
-                .subscribe(async (status) => {
-                    console.log(`📡 [Realtime] สถานะ (${direction}):`, status);
-                    if (status === 'SUBSCRIBED') {
-                        console.log("✅ [%cRealtime Connected%c] -> ตาราง notifications พร้อมใช้งาน!", "color: #10b981; font-weight: bold", "");
-                    }
-                    if (status === 'CHANNEL_ERROR') {
-                        console.error("❌ [%cRealtime Error%c] -> เชื่อมต่อไม่ติด! (รบกวนเช็ค SQL ในขั้นตอนที่ 1)", "color: #ef4444; font-weight: bold", "");
-                    }
-                    if (status === 'TIMED_OUT') {
-                        console.warn("⏳ [Realtime] การเชื่อมต่อหมดเวลา (Timed Out)...");
-                    }
-                });
-
-            return () => {
-                console.log("📴 ยกเลิกการเชื่อมต่อ Channel");
-                supabase.removeChannel(channel);
-            };
+        if (userId === "") {
+            console.warn("⚠️ [Realtime] UserId ว่างเปล่า ข้ามการเชื่อมต่อ");
+            return;
         }
+
+        console.log(`🔔 [Realtime] เริ่มต้นการเชื่อมต่อสำหรับ User: ${userId} (${direction})`);
+        fetchNotifications();
+
+        const channel = supabase
+            .channel(`realtime-notifications-${userId}-${direction}-${Date.now()}`) // Unique name with timestamp
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'notifications'
+                // นำ filter ออกแล้วเช็คใน Code แทนเพื่อความแม่นยำ (RLS จะคุมความปลอดภัยให้เอง)
+            }, (payload) => {
+                console.log("⚡ [Realtime] พัสดุมาถึงแล้ว (Raw Payload):", payload);
+                const newNotif = payload.new as Notification;
+
+                if (!newNotif) {
+                    console.warn("⚠️ [Realtime] ข้อมูลที่ส่งมาว่างเปล่า (Empty Payload)");
+                    return;
+                }
+
+                // เช็คว่าเป็นการแจ้งเตือนของเราจริงไหม
+                if (newNotif.user_id !== userId) {
+                    console.log(`⏭️ [Realtime] ข้ามแจ้งเตือนนี้ (ไม่ใช่ของเรา) -> Target: ${newNotif.user_id}, Current: ${userId}`);
+                    return;
+                }
+
+                console.log("🚀 [Realtime] ตรวจพบแจ้งเตือนใหม่สำหรับเรา!", newNotif);
+
+                // Shake the bell locally
+                setIsShaking(false);
+                setTimeout(() => {
+                    setIsShaking(true);
+                    setTimeout(() => setIsShaking(false), 800);
+                }, 10);
+
+                fetchNotifications();
+            })
+            .subscribe(async (status) => {
+                console.log(`📡 [Realtime] สถานะ (${direction}):`, status);
+                if (status === 'SUBSCRIBED') {
+                    console.log("✅ [%cRealtime Connected%c] -> ตาราง notifications พร้อมใช้งาน!", "color: #10b981; font-weight: bold", "");
+                }
+                if (status === 'CHANNEL_ERROR') {
+                    console.error("❌ [%cRealtime Error%c] -> เชื่อมต่อไม่ติด! (รบกวนเช็ค SQL ในขั้นตอนที่ 1)", "color: #ef4444; font-weight: bold", "");
+                }
+                if (status === 'TIMED_OUT') {
+                    console.warn("⏳ [Realtime] การเชื่อมต่อหมดเวลา (Timed Out)...");
+                }
+            });
+
+        return () => {
+            console.log("📴 ยกเลิกการเชื่อมต่อ Channel");
+            supabase.removeChannel(channel);
+        };
     }, [userId]);
 
     const markAllAsRead = async () => {

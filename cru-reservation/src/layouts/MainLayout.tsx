@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { LayoutDashboard, Search, CalendarDays, LogOut, Moon, Sun, Settings, HelpCircle, Menu, X } from "lucide-react";
 import NotificationBell from "../components/NotificationBell";
+import NotificationListener from "../components/NotificationListener";
 
 import { useAuth } from "../lib/auth";
 import { supabase } from "../lib/supabaseClient";
@@ -88,6 +89,7 @@ export default function MainLayout() {
     return (
         // ✅ Keep original overflow-hidden and h-screen
         <div className="h-screen supports-[height:100dvh]:h-[100dvh] relative text-slate-900 dark:text-slate-100 overflow-hidden transition-colors duration-300 flex flex-col">
+            <NotificationListener />
 
             {/* Mobile Navbar - Visible only on mobile */}
             <div className="md:hidden flex items-center justify-between px-4 h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50">

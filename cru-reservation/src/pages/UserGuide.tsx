@@ -68,18 +68,18 @@ export default function UserGuide() {
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border dark:border-slate-700">
                                         <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1">ขั้นตอนที่ 1</div>
-                                        <h4 className="text-sm font-bold mb-1 dark:text-white">ระบุเวลา</h4>
-                                        <p className="text-[11px] text-slate-500">เลือกช่วงเวลาจัดเตรียมห้อง และเวลาใช้งานจริง</p>
+                                        <h4 className="text-sm font-bold mb-1 dark:text-white">ระบุวันและเวลา</h4>
+                                        <p className="text-[11px] text-slate-500">เลือกช่วงเวลาจัดเตรียมและใช้งานจริง **(วันที่เตรียมห้ามเกินวันที่ใช้จริง)**</p>
                                     </div>
                                     <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border dark:border-slate-700">
                                         <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1">ขั้นตอนที่ 2</div>
                                         <h4 className="text-sm font-bold mb-1 dark:text-white">กรอกรายละเอียด</h4>
-                                        <p className="text-[11px] text-slate-500">ระบุชื่อโครงการ และเลือกจำนวนผู้ใช้จากรายการ</p>
+                                        <p className="text-[11px] text-slate-500">ระบุชื่อโครงการ วัตถุประสงค์ และจำนวนผู้ใช้จากรายการ</p>
                                     </div>
                                     <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border dark:border-slate-700">
                                         <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1">ขั้นตอนที่ 3</div>
                                         <h4 className="text-sm font-bold mb-1 dark:text-white">กดยืนยัน</h4>
-                                        <p className="text-[11px] text-slate-500">ตรวจสอบความถูกต้องทั้งหมดเพื่อส่งคำขอ</p>
+                                        <p className="text-[11px] text-slate-500">ตรวจสอบความถูกต้องทั้งหมดเพื่อส่งคำขอจอง</p>
                                     </div>
                                 </div>
                             </div>
@@ -93,13 +93,23 @@ export default function UserGuide() {
                                 <Bell className="text-blue-600 dark:text-blue-400 w-6 h-6" />
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">4. การติดตามผล</h2>
-                                <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
-                                    ตรวจสอบสถานะการจองของคุณได้ที่เมนู **"การจองของฉัน"** หากการจองได้รับการอนุมัติ ข้อมูลจะถูกบันทึกลงในปฏิทินกลางของห้องนั้นทันที
+                                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">4. การแจ้งเตือนแบบ Real-time</h2>
+                                <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-3">
+                                    ระบบจะแจ้งเตือนคุณทันที **(โดยไม่ต้องกด Refresh)** เมื่อมีการเคลื่อนไหว เช่น คำขอถูกอนุมัติหรือปฏิเสธ
                                 </p>
+                                <div className="flex flex-wrap gap-2">
+                                    <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] px-2 py-1 rounded-lg font-bold">🔔 กระดิ่งสั่นเตือน</span>
+                                    <span className="bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[10px] px-2 py-1 rounded-lg font-bold">🎵 เสียงแจ้งเตือน</span>
+                                    <span className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] px-2 py-1 rounded-lg font-bold">🚀 แจ้งเตือนเด้งทันที</span>
+                                </div>
                             </div>
                         </div>
                     </section>
+
+                    {/* SHORTCUT TIP */}
+                    <p className="text-center text-[10px] text-slate-400 dark:text-slate-500 font-medium italic">
+                        เคล็ดลับ: คลิกที่ชื่อ "ระบบจองห้องประชุม" ในแถบข้างเพื่อกลับหน้าแรกได้ทันที!
+                    </p>
 
                     {/* ADMIN SECTION */}
                     <div className="pt-6 border-t dark:border-slate-800">
