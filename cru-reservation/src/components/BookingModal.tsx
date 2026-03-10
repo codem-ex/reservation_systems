@@ -177,22 +177,35 @@ const BookingModal: React.FC<BookingModalProps> = ({
         setAlertOpen(true);
     };
 
-    const busyDateStrings = useMemo(() => {
-        const set = new Set<string>();
+    const reservationMap = useMemo(() => {
+        const map = new Map<string, { title: string; type: 'use' | 'setup' }>();
         existingReservations.forEach(r => {
+            // Event usage
             let curr = dayjs(r.start_at).startOf('day');
             const end = dayjs(r.end_at).startOf('day');
             while (!curr.isAfter(end)) {
-                set.add(curr.format('YYYY-MM-DD'));
+                map.set(curr.format('YYYY-MM-DD'), { title: r.title || "ไม่ระบุชื่อช่วง", type: 'use' });
                 curr = curr.add(1, 'day');
             }
+
+            // Setup time
+            if (r.setup_start_at && r.setup_end_at) {
+                let sCurr = dayjs(r.setup_start_at).startOf('day');
+                const sEnd = dayjs(r.setup_end_at).startOf('day');
+                while (!sCurr.isAfter(sEnd)) {
+                    // Only mark as setup if it's not already marked as use (use takes priority)
+                    const key = sCurr.format('YYYY-MM-DD');
+                    if (!map.has(key)) {
+                        map.set(key, { title: r.title || "ไม่ระบุชื่อช่วง", type: 'setup' });
+                    }
+                    sCurr = sCurr.add(1, 'day');
+                }
+            }
         });
-        return set;
+        return map;
     }, [existingReservations]);
 
-    const disabledDates = useMemo(() => {
-        return Array.from(busyDateStrings).map(s => dayjs(s).toDate());
-    }, [busyDateStrings]);
+    const busyDateStrings = useMemo(() => new Set(reservationMap.keys()), [reservationMap]);
 
 
 
@@ -202,23 +215,65 @@ const BookingModal: React.FC<BookingModalProps> = ({
     const setupEndDate = setupRange.endDate ?? setupStartDate;
 
     const labelUse = useMemo(() => fmtRange(useStart, useEnd), [useStart, useEnd]);
+
+    // Calculate exact dates in setup range to disable them in Use tab
+    const setupDateDays = useMemo(() => {
+        const dates: Date[] = [];
+        if (!setupRange.startDate || !setupRange.endDate) return dates;
+        let curr = dayjs(setupRange.startDate).startOf('day');
+        const endDay = dayjs(setupRange.endDate).startOf('day');
+        // Only include if more than one click (a real range or confirmed single day)
+        // But per user request, we basically disable whatever setup picked
+        while (curr.isBefore(endDay) || curr.isSame(endDay, 'day')) {
+            dates.push(curr.toDate());
+            curr = curr.add(1, 'day');
+        }
+        return dates;
+    }, [setupRange.startDate, setupRange.endDate]);
+
     const labelSetup = useMemo(
         () => fmtRange(setupStartDate, setupEndDate),
         [setupStartDate, setupEndDate]
     );
 
-    const onRangeChange = (item: RangeKeyDict) => {
-        const r = item[active];
-        if (!r?.startDate || !r?.endDate) return;
+    const [focusedRange, setFocusedRange] = useState<[number, number]>([0, 0]);
 
-        if (active === "use") {
-            setUseRange({ key: "use", startDate: r.startDate, endDate: r.endDate });
-        } else {
-            setSetupRange({
-                key: "setup",
-                startDate: r.startDate,
-                endDate: r.endDate,
-            });
+    const handleSelect = (ranges: RangeKeyDict) => {
+        const { use, setup } = ranges;
+        const target = active === "use" ? use : setup;
+        const current = active === "use" ? useRange : setupRange;
+        const setter = active === "use" ? setUseRange : setSetupRange;
+
+        if (!target?.startDate || !target?.endDate) return;
+
+        const start = dayjs(target.startDate).startOf('day');
+        const end = dayjs(target.endDate).startOf('day');
+        const currStart = dayjs(current.startDate).startOf('day');
+        const currEnd = dayjs(current.endDate).startOf('day');
+
+        // Logic 1: Click same date twice when it's just a single day -> Reset
+        const isSingleDay = currStart.isSame(currEnd, 'day');
+        const clickedSameDay = start.isSame(currStart, 'day') && end.isSame(currStart, 'day');
+
+        if (isSingleDay && clickedSameDay) {
+            setter({ key: active, startDate: startOfDay(new Date()), endDate: startOfDay(new Date()) });
+            return;
+        }
+
+        // Logic 2: Reset on new click after range formed
+        const hasFullRange = !currStart.isSame(currEnd, 'day');
+        const isNewClick = start.isSame(end, 'day');
+        if (hasFullRange && isNewClick) {
+            setter({ key: active, startDate: target.startDate, endDate: target.startDate });
+            return;
+        }
+
+        // Apply selection
+        setter({ key: active, startDate: target.startDate, endDate: target.endDate });
+
+        // AUTOMATIC SWITCH: If setup is picked (range formed), jump to use
+        if (active === "setup" && !start.isSame(end, 'day')) {
+            setTimeout(() => setActive("use"), 300); // Slight delay for visual feedback
         }
     };
 
@@ -226,7 +281,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
         try {
             const { data } = await supabase
                 .from("reservations")
-                .select("start_at, end_at, status")
+                .select("title, start_at, end_at, status, setup_start_at, setup_end_at")
                 .eq("room_id", room.id)
                 .in("status", ["PENDING", "APPROVED"]);
             if (data) setExistingReservations(data);
@@ -236,8 +291,18 @@ const BookingModal: React.FC<BookingModalProps> = ({
     };
 
     useEffect(() => {
+        // ALWAYS use index 0 because in both cases the "active" range is the first element in the array we pass
+        setFocusedRange([0, 0]);
         fetchExisting();
-    }, [room.id]);
+    }, [active, room.id]);
+
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onClose();
+        };
+        window.addEventListener("keydown", handleEsc);
+        return () => window.removeEventListener("keydown", handleEsc);
+    }, [onClose]);
 
     const hasConflict = useMemo(() => {
         const start = dayjs(buildISO(useStart, startTime));
@@ -374,7 +439,12 @@ const BookingModal: React.FC<BookingModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-300">
+        <div
+            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-300"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+        >
             <div className="w-full max-w-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20 dark:border-slate-800/50 flex flex-col max-h-[95dvh] sm:max-h-[90vh] animate-in zoom-in-95 duration-300">
                 <div className="bg-slate-50 dark:bg-slate-950 px-5 py-5 relative border-b border-slate-100 dark:border-white/5">
                     <div className="flex items-start justify-between gap-4">
@@ -412,6 +482,12 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     </div>
                 </div>
 
+                <style>{`
+                    .rdrDayToday .rdrDayNumber span:after {
+                        display: none !important;
+                    }
+                `}</style>
+
                 {/* body */}
                 <div className="flex flex-col gap-6 px-5 sm:px-8 py-6 sm:py-8 overflow-y-auto custom-scrollbar flex-1">
                     {step === 1 && (
@@ -437,39 +513,65 @@ const BookingModal: React.FC<BookingModalProps> = ({
                                 <div className="w-full flex justify-center transform scale-100 origin-top mb-4 rounded-2xl overflow-hidden shadow-sm">
                                     <DateRange
                                         locale={th}
-                                        ranges={[useRange, setupRange]}
-                                        onChange={onRangeChange}
-                                        focusedRange={active === "use" ? [0, 0] : [1, 0]}
-                                        showDateDisplay={false}
-                                        months={1}
-                                        direction="horizontal"
-                                        rangeColors={["#4f46e5", "#f59e0b"]}
-                                        minDate={active === "use" ? setupEndDate : startOfDay(new Date())}
-                                        maxDate={active === "setup" ? useStart : undefined}
-                                        disabledDates={disabledDates}
+                                        ranges={active === "setup" ? [setupRange] : [useRange, setupRange]}
+                                        onChange={handleSelect}
+                                        focusedRange={focusedRange}
                                         // @ts-ignore
-                                        dragSelectionEnabled={true}
+                                        onRangeFocusChange={(newRange) => {
+                                            if (newRange && Array.isArray(newRange)) {
+                                                setFocusedRange([0, newRange[1]]);
+                                            }
+                                        }}
+                                        disabledDates={[
+                                            ...Array.from(busyDateStrings).map(s => dayjs(s).toDate()),
+                                            ...(active === "use" ? setupDateDays : [])
+                                        ]}
+                                        minDate={startOfDay(new Date())}
+                                        months={1}
+                                        direction="vertical"
+                                        showDateDisplay={false}
+                                        rangeColors={active === "setup" ? ["#f59e0b"] : ["#4f46e5", "#f59e0b"]}
                                         // @ts-ignore
                                         moveRangeOnFirstSelection={false}
                                         // @ts-ignore
+                                        dragSelectionEnabled={false}
+                                        // @ts-ignore
                                         preventSnapRefocus={true}
                                         dayContentRenderer={(day: Date) => {
-                                            const dateStr = dayjs(day).format('YYYY-MM-DD');
-                                            const isBusy = busyDateStrings.has(dateStr);
+                                            const dateStr = dayjs(day).format("YYYY-MM-DD");
+                                            const res = reservationMap.get(dateStr);
+                                            const isBusy = !!res;
+
                                             return (
-                                                <div className="relative w-full h-full flex flex-col items-center justify-center group/day pointer-events-none">
-                                                    <span className={`z-10 ${isBusy ? 'opacity-50' : ''}`}>{day.getDate()}</span>
+                                                <div className="relative w-full h-full flex flex-col items-center justify-center pointer-events-none">
+                                                    <span className={`text-xs font-black transition-all ${isBusy ? "text-slate-300 dark:text-slate-600" : "text-slate-700 dark:text-slate-200"}`}>
+                                                        {day.getDate()}
+                                                    </span>
                                                     {isBusy && (
-                                                        <div
-                                                            className="absolute bottom-1 w-4 h-[3px] bg-red-500 rounded-full z-20 shadow-sm shadow-red-200"
-                                                            title="ไม่ว่าง"
-                                                        />
+                                                        <div className="absolute bottom-1.5 w-4 h-[2px] bg-red-500 rounded-full shadow-sm shadow-red-200" />
                                                     )}
                                                 </div>
                                             );
                                         }}
                                     />
                                 </div>
+
+                                {/* Legend */}
+                                <div className="w-full flex justify-center gap-4 mb-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-orange-500 shadow-sm" />
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">จัดเตรียม</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-indigo-600 shadow-sm" />
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">วันใช้งานจริง</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-sm" />
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">จองแล้ว</span>
+                                    </div>
+                                </div>
+
                                 <div className="w-full text-center py-2.5 text-sm border-t border-slate-100 dark:border-slate-800 mt-1 bg-white dark:bg-slate-900/50 rounded-xl shadow-sm">
                                     <span className="font-black text-slate-800 dark:text-white uppercase tracking-wider text-sm">
                                         {active === "use" ? labelUse : labelSetup}
