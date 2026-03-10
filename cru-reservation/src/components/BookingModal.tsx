@@ -163,6 +163,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
     const [showSuccess, setShowSuccess] = useState(false);
     const [existingReservations, setExistingReservations] = useState<any[]>([]);
     const [step, setStep] = useState(1);
+    const [isCustomGuest, setIsCustomGuest] = useState(false);
 
     // Custom Alert Modal
     const [alertOpen, setAlertOpen] = useState(false);
@@ -526,7 +527,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
                                             ...Array.from(busyDateStrings).map(s => dayjs(s).toDate()),
                                             ...(active === "use" ? setupDateDays : [])
                                         ]}
-                                        minDate={startOfDay(new Date())}
+                                        minDate={
+                                            active === "use" && setupRange.startDate
+                                                ? setupRange.startDate
+                                                : startOfDay(new Date())
+                                        }
                                         months={1}
                                         direction="vertical"
                                         showDateDisplay={false}
@@ -621,20 +626,40 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">จำนวนผู้ร่วม (คน)</label>
-                                    <div className="relative">
-                                        <select
-                                            value={guestCount}
-                                            onChange={(e) => setGuestCount(Number(e.target.value))}
-                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-11 py-2.5 text-lg font-black text-slate-800 dark:text-white focus:border-indigo-500 focus:bg-white outline-none appearance-none shadow-sm cursor-pointer"
-                                        >
-                                            {[...Array(room.capacity || 50)].map((_, i) => (
-                                                <option key={i + 1} value={i + 1}>
-                                                    {i + 1} คน
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <Users className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                                        <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                    <div className="space-y-3">
+                                        <div className="relative">
+                                            <select
+                                                value={isCustomGuest ? "custom" : guestCount}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val === "custom") {
+                                                        setIsCustomGuest(true);
+                                                    } else {
+                                                        setIsCustomGuest(false);
+                                                        setGuestCount(Number(val));
+                                                    }
+                                                }}
+                                                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl px-11 py-2.5 text-lg font-black text-slate-800 dark:text-white focus:border-indigo-500 focus:bg-white outline-none appearance-none shadow-sm cursor-pointer"
+                                            >
+                                                <option value="" disabled>เลือกจำนวนผู้ร่วม</option>
+                                                {[10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200].map(v => (
+                                                    <option key={v} value={v}>{v} คน</option>
+                                                ))}
+                                                <option value="custom">ระบุนอกเหนือจากนี้...</option>
+                                            </select>
+                                            <Users className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                            <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                        </div>
+
+                                        {isCustomGuest && (
+                                            <input
+                                                type="number"
+                                                value={guestCount}
+                                                onChange={(e) => setGuestCount(Number(e.target.value))}
+                                                placeholder="กรุณาระบุจำนวนคน..."
+                                                className="w-full bg-slate-50 dark:bg-slate-900 border border-indigo-200 dark:border-indigo-900/50 rounded-xl px-4 py-2.5 text-lg font-black text-indigo-600 dark:text-indigo-400 focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm animate-in slide-in-from-top-2"
+                                            />
+                                        )}
                                     </div>
                                 </div>
 
