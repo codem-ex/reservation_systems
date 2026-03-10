@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+.env
+.env.*
+# Ignore sibling projects if they aren't part of this repo's intent
+/CRU Reservation/
+/my-app/
+/plasma-bohr/
+/backend/
