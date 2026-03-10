@@ -262,6 +262,23 @@ const BookingModal: React.FC<BookingModalProps> = ({
             if (!Number.isFinite(setS) || !Number.isFinite(setE)) return "เวลาจัดเตรียมไม่ถูกต้อง";
             if (setS >= setE) return "เวลาจัดเตรียม: เวลาเริ่มต้องน้อยกว่าเวลาสิ้นสุด";
 
+            // Date validation: Setup must be before or on Use day
+            const dSetupEnd = dayjs(setupEndDate).startOf('day');
+            const dUseStart = dayjs(useStart).startOf('day');
+
+            if (dSetupEnd.isAfter(dUseStart)) {
+                return "วันที่จัดเตรียมห้ามเกินวันที่ใช้งานจริง";
+            }
+
+            // If same day, setup must end before or at use start time
+            if (dSetupEnd.isSame(dUseStart)) {
+                const setE = timeToMinutes(setupEnd);
+                const useS = timeToMinutes(startTime);
+                if (setE > useS) {
+                    return "ในวันที่เดียวกัน: เวลาจัดเตรียมเสร็จสิ้นต้องไม่เกินเวลาเริ่มใช้งานจริง";
+                }
+            }
+
             if (hasConflict) return "ช่วงเวลานี้ถูกจองไปแล้ว กรุณาเลือกเวลาอื่น";
         }
 
@@ -427,7 +444,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
                                         months={1}
                                         direction="horizontal"
                                         rangeColors={["#4f46e5", "#f59e0b"]}
-                                        minDate={startOfDay(new Date())}
+                                        minDate={active === "use" ? setupEndDate : startOfDay(new Date())}
+                                        maxDate={active === "setup" ? useStart : undefined}
                                         disabledDates={disabledDates}
                                         // @ts-ignore
                                         dragSelectionEnabled={true}
