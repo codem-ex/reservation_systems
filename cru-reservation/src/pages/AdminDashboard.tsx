@@ -647,6 +647,26 @@ const AdminDashboard = () => {
         return <div className="p-8 text-center text-gray-500">Loading reservations...</div>;
     }
 
+    if (!isAdmin && !profiles.find(p => p.id === supabaseUser?.id && p.stage_no && p.stage_no > 0)) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 px-4 text-center animate-in fade-in zoom-in duration-500">
+                <div className="w-24 h-24 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-6">
+                    <AlertCircle className="w-12 h-12 text-red-600 dark:text-red-400" />
+                </div>
+                <h1 className="text-3xl font-black text-slate-900 dark:text-white mb-4">พื้นที่จำกัดสำหรับผู้ดูแล</h1>
+                <p className="text-lg text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-10 leading-relaxed">
+                    คุณไม่มีสิทธิ์ในการเข้าถึงหน้าจัดการระบบ เฉพาะผู้ดูแลระบบและผู้อนุมัติเท่านั้นที่มีสิทธิ์เข้าใช้งานในส่วนนี้
+                </p>
+                <Link 
+                    to="/" 
+                    className="px-8 py-4 bg-slate-900 dark:bg-indigo-600 text-white font-bold rounded-2xl transition-all hover:scale-105 active:scale-95 shadow-xl shadow-indigo-500/20"
+                >
+                    กลับสู่หน้าแรก
+                </Link>
+            </div>
+        );
+    }
+
     /* ===============================
        Render
     =============================== */

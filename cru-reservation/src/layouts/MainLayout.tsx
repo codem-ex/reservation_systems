@@ -12,6 +12,8 @@ type ProfileLite = {
     display_name: string | null;
     email: string | null;
     avatar_url: string | null;
+    is_admin: boolean | null;
+    stage_no: number | null;
 };
 
 export default function MainLayout() {
@@ -68,7 +70,7 @@ export default function MainLayout() {
 
             const { data } = await supabase
                 .from("profiles")
-                .select("id, display_name, email, avatar_url")
+                .select("id, display_name, email, avatar_url, is_admin, stage_no")
                 .eq("id", supabaseUser.id)
                 .maybeSingle();
 
@@ -170,10 +172,12 @@ export default function MainLayout() {
                                 การจองของฉัน
                             </NavLink>
 
-                            <NavLink to="/admin" className={navItemClass} onClick={() => setIsMobileMenuOpen(false)}>
-                                <Settings className="w-5 h-5 mr-3" />
-                                จัดการระบบ
-                            </NavLink>
+                            {(profile?.is_admin || (profile?.stage_no !== null && profile?.stage_no > 0)) && (
+                                <NavLink to="/admin" className={navItemClass} onClick={() => setIsMobileMenuOpen(false)}>
+                                    <Settings className="w-5 h-5 mr-3" />
+                                    จัดการระบบ
+                                </NavLink>
+                            )}
 
                             <NavLink to="/help" className={navItemClass} onClick={() => setIsMobileMenuOpen(false)}>
                                 <HelpCircle className="w-5 h-5 mr-3" />
