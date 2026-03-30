@@ -172,7 +172,7 @@ export default function MainLayout() {
                                 การจองของฉัน
                             </NavLink>
 
-                            {(profile?.is_admin || (profile?.stage_no !== null && profile?.stage_no > 0)) && (
+                            {(profile?.is_admin || (profile && profile.stage_no && profile.stage_no > 0)) && (
                                 <NavLink to="/admin" className={navItemClass} onClick={() => setIsMobileMenuOpen(false)}>
                                     <Settings className="w-5 h-5 mr-3" />
                                     จัดการระบบ
