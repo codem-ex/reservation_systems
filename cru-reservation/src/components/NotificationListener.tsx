@@ -37,6 +37,8 @@ const NotificationListener = () => {
                 }
 
                 // 2. แสดง Pop-up (ครั้งเดียว)
+                const isDark = document.documentElement.classList.contains("dark");
+                
                 toast.success(
                     (t) => (
                         <div className="flex flex-col gap-1 cursor-pointer pr-4 min-w-[200px]" onClick={() => {
@@ -47,8 +49,8 @@ const NotificationListener = () => {
                                 navigate("/bookings");
                             }
                         }}>
-                            <span className="font-bold text-sm text-slate-900">{newNotif.title}</span>
-                            <span className="text-xs text-slate-600 line-clamp-2">{newNotif.message}</span>
+                            <span className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>{newNotif.title}</span>
+                            <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'} line-clamp-2`}>{newNotif.message}</span>
                         </div>
                     ),
                     {
@@ -57,10 +59,13 @@ const NotificationListener = () => {
                         icon: <Bell className="w-5 h-5 text-indigo-500 animate-bounce" />,
                         style: {
                             borderRadius: '16px',
-                            background: '#fff',
-                            border: '1px solid #e2e8f0',
+                            background: isDark ? '#1e293b' : '#fff',
+                            border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+                            color: isDark ? '#f8fafc' : '#1e293b',
                             padding: '16px',
-                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                            boxShadow: isDark 
+                                ? '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.2)' 
+                                : '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
                             zIndex: 9999
                         }
                     }

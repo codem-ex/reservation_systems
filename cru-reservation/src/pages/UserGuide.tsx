@@ -28,31 +28,53 @@ export default function UserGuide() {
 
                 <div className="space-y-8">
                     {/* STEP 1: LOGIN */}
-                    <section className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-100 dark:border-slate-800">
+                    <section className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-100 dark:border-slate-800 shadow-sm">
                         <div className="flex items-start gap-6">
                             <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center shrink-0">
                                 <User className="text-indigo-600 dark:text-indigo-400 w-6 h-6" />
                             </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">1. การเข้าสู่ระบบ</h2>
-                                <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
-                                    เข้าใช้งานด้วย **Google Account** หากเข้าใช้งานครั้งแรก ระบบจะให้กรอกข้อมูล **แผนก** และ **เบอร์โทรศัพท์** เพื่อใช้สำหรับติดต่อและแจ้งผลการอนุมัติ
-                                </p>
+                            <div className="flex-1">
+                                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-3">1. การเข้าสู่ระบบเข้าใช้งานครั้งแรก</h2>
+                                <div className="space-y-3 text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
+                                    <p>
+                                        ท่านสามารถเข้าใช้งานระบบได้ทันทีผ่านบัญชี Google Account ขององค์กรเพื่อความสะดวกและรวดเร็ว
+                                    </p>
+                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700/50">
+                                        <p className="font-bold text-slate-800 dark:text-white mb-2">ข้อมูลที่ต้องระบุเพิ่มเติมในครั้งแรก:</p>
+                                        <ul className="list-disc list-inside space-y-1 text-xs">
+                                            <li>แผนกหรือสังกัด (เพื่อระบุที่มาของคำขอ)</li>
+                                            <li>เบอร์โทรศัพท์มือถือ (สำหรับการติดต่อสอบถามกรณีเร่งด่วน)</li>
+                                        </ul>
+                                    </div>
+                                    <p className="text-[11px] text-indigo-500 font-medium">หมายเหตุ: ข้อมูลนี้จะถูกบันทึกไว้เพียงครั้งเดียวและสามารถแก้ไขได้ในภายหลังที่หน้าโปรไฟล์</p>
+                                </div>
                             </div>
                         </div>
                     </section>
 
                     {/* STEP 2: SEARCH */}
-                    <section className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-100 dark:border-slate-800">
+                    <section className="bg-white dark:bg-slate-900 rounded-3xl p-8 border border-slate-100 dark:border-slate-800 shadow-sm">
                         <div className="flex items-start gap-6">
                             <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center shrink-0">
                                 <Search className="text-emerald-600 dark:text-emerald-400 w-6 h-6" />
                             </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">2. วิธีการค้นหาห้อง</h2>
-                                <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-4">
-                                    ไปที่เมนู **"ค้นหาห้องประชุม"** ระบุวันที่ เวลา และจำนวนผู้เข้าร่วมเพื่อกรองห้องที่ว่าง จากนั้นคลิกปุ่ม **"จองห้องนี้"** ในห้องที่ต้องการ
-                                </p>
+                            <div className="flex-1">
+                                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-3">2. วิธีการค้นหาและตรวจสอบห้องว่าง</h2>
+                                <div className="space-y-4 text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
+                                    <p>
+                                        ท่านสามารถเลือกดูรายการห้องประชุมทั้งหมดได้จากเมนู "ค้นหาห้องประชุม" พร้อมระบบกรองข้อมูลที่แม่นยำ
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="p-3 bg-emerald-50/50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100/50 dark:border-emerald-800/30">
+                                            <span className="block font-bold text-emerald-700 dark:text-emerald-400 mb-1">กรองข้อมูล:</span>
+                                            <p className="text-[11px]">ระบุวันที่ เวลาที่เริ่ม/จบ และจำนวนผู้เข้าร่วม เพื่อให้ระบบแสดงเฉพาะห้องที่ว่างจริงๆ เท่านั้น</p>
+                                        </div>
+                                        <div className="p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-xl border border-blue-100/50 dark:border-blue-800/30">
+                                            <span className="block font-bold text-blue-700 dark:text-blue-400 mb-1">เลือกจอง:</span>
+                                            <p className="text-[11px]">เมื่อพบห้องที่ถูกใจ สามารถคลิกที่ปุ่ม "จองห้องนี้" หรือคลิกที่รูปภาพเพื่อดูรายละเอียดสิ่งอำนวยความสะดวกก่อนได้</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </section>
@@ -63,23 +85,27 @@ export default function UserGuide() {
                             <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
                                 <CalendarCheck className="text-amber-600 dark:text-amber-400 w-6 h-6" />
                             </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">3. ขั้นตอนการกรอกข้อมูลการจอง</h2>
+                            <div className="flex-1">
+                                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">3. ขั้นตอนการทำรายการจอง (3 ขั้นตอนสั้นๆ)</h2>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border dark:border-slate-700">
-                                        <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1">ขั้นตอนที่ 1</div>
-                                        <h4 className="text-sm font-bold mb-1 dark:text-white">ระบุวันและเวลา</h4>
-                                        <p className="text-[11px] text-slate-500">เลือกช่วงเวลาจัดเตรียมและใช้งานจริง **(วันที่เตรียมห้ามเกินวันที่ใช้จริง)**</p>
+                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                                        <div className="text-xs font-bold text-amber-600 mb-2 underline decoration-2">ขั้นที่ 1: วันและเวลา</div>
+                                        <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                                            เลือกช่วงเวลาจัดเตรียมสถานที่และเวลาใช้งานจริง ปฏิทินจะแสดงสีส้มและน้ำเงินเพื่อให้เห็นภาพรวมที่ชัดเจน
+                                        </p>
+                                        <p className="mt-2 text-[9px] text-red-500 font-bold">* วันที่เตรียมห้ามอยู่หลังวันที่ใช้งานจริง</p>
                                     </div>
-                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border dark:border-slate-700">
-                                        <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1">ขั้นตอนที่ 2</div>
-                                        <h4 className="text-sm font-bold mb-1 dark:text-white">กรอกรายละเอียด</h4>
-                                        <p className="text-[11px] text-slate-500">ระบุชื่อโครงการ วัตถุประสงค์ และจำนวนผู้ใช้จากรายการ</p>
+                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                                        <div className="text-xs font-bold text-amber-600 mb-2 underline decoration-2">ขั้นที่ 2: กรอกข้อมูล</div>
+                                        <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                                            กรอกหัวข้อการประชุม วัตถุประสงค์ และจำนวนผู้ใช้ (เลือกจากรายการหรือระบุเองได้จนถึง 200 คน)
+                                        </p>
                                     </div>
-                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border dark:border-slate-700">
-                                        <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1">ขั้นตอนที่ 3</div>
-                                        <h4 className="text-sm font-bold mb-1 dark:text-white">กดยืนยัน</h4>
-                                        <p className="text-[11px] text-slate-500">ตรวจสอบความถูกต้องทั้งหมดเพื่อส่งคำขอจอง</p>
+                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                                        <div className="text-xs font-bold text-amber-600 mb-2 underline decoration-2">ขั้นที่ 3: ตรวจสอบและส่ง</div>
+                                        <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                                            ตรวจสอบสรุปข้อมูลเป็นครั้งสุดท้ายก่อนกดปุ่ม "ยืนยันการจอง" เพื่อส่งไปยังผู้ดูแลระบบ
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -92,15 +118,21 @@ export default function UserGuide() {
                             <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
                                 <Bell className="text-blue-600 dark:text-blue-400 w-6 h-6" />
                             </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">4. การแจ้งเตือนแบบ Real-time</h2>
-                                <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed mb-3">
-                                    ระบบจะแจ้งเตือนคุณทันที **(โดยไม่ต้องกด Refresh)** เมื่อมีการเคลื่อนไหว เช่น คำขอถูกอนุมัติหรือปฏิเสธ
+                            <div className="flex-1">
+                                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">4. การติดตามและแจ้งเตือน Real-time</h2>
+                                <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mb-4">
+                                    ระบบจะแจ้งเตือนความคืบหน้าให้ท่านทราบทันทีเมื่อมีผู้ดูแลระบบดำเนินการ (โดยไม่ต้องกด Refresh หน้าเว็บ)
                                 </p>
-                                <div className="flex flex-wrap gap-2">
-                                    <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] px-2 py-1 rounded-lg font-bold">🔔 กระดิ่งสั่นเตือน</span>
-                                    <span className="bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[10px] px-2 py-1 rounded-lg font-bold">🎵 เสียงแจ้งเตือน</span>
-                                    <span className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] px-2 py-1 rounded-lg font-bold">🚀 แจ้งเตือนเด้งทันที</span>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    <span className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] px-3 py-2 rounded-xl font-bold border border-indigo-100 dark:border-indigo-800">
+                                        <span className="animate-bounce">🔔</span> กระดิ่งแจ้งเตือนสั่น
+                                    </span>
+                                    <span className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[10px] px-3 py-2 rounded-xl font-bold border border-amber-100 dark:border-amber-800">
+                                        📢 เสียงเตือนกิจกรรม
+                                    </span>
+                                    <span className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] px-3 py-2 rounded-xl font-bold border border-emerald-100 dark:border-emerald-800">
+                                        📊 สถานะอัปเดตอัตโนมัติ
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -119,15 +151,15 @@ export default function UserGuide() {
                                     <ShieldCheck className="text-white w-6 h-6" />
                                 </div>
                                 <div className="flex-1">
-                                    <h2 className="text-lg font-bold mb-3">สำหรับผู้ดูแลระบบและผู้อนุมัติ</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-300">
-                                        <div className="flex gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1 shrink-0" />
-                                            <p>ตรวจสอบและอนุมัติรายการในเมนู **จัดการระบบ**</p>
+                                    <h2 className="text-lg font-bold mb-3 text-indigo-400">สำหรับผู้ดูแลระบบและผู้อนุมัติ</h2>
+                                    <div className="space-y-3 text-xs text-slate-300">
+                                        <div className="flex gap-3">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
+                                            <p>ตรวจสอบและอนุมัติรายการที่ค้างอยู่ได้จากเมนู "จัดการระบบ" โดยจะแสดงลำดับการอนุมัติ (Chain) อย่างชัดเจน</p>
                                         </div>
-                                        <div className="flex gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1 shrink-0" />
-                                            <p>รายการที่อนุมัติแล้วจะซิงค์เข้า **Google Calendar** อัตโนมัติ</p>
+                                        <div className="flex gap-3">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                                            <p>เมื่อรายการได้รับการอนุมัติเสร็จสมบูรณ์ ระบบจะซิงค์ข้อมูลเข้าสู่ Google Calendar โดยอัตโนมัติเพื่อให้คนอื่นๆ เห็นหัวข้อกิจกรรม</p>
                                         </div>
                                     </div>
                                 </div>

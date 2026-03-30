@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { X, User as UserIcon, Check, Users, AlertCircle, ChevronDown } from "lucide-react";
+import { X, User as UserIcon, Check, Users, AlertCircle, ChevronDown, Trash2 } from "lucide-react";
 
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -164,6 +164,71 @@ const BookingModal: React.FC<BookingModalProps> = ({
     const [existingReservations, setExistingReservations] = useState<any[]>([]);
     const [step, setStep] = useState(1);
     const [isCustomGuest, setIsCustomGuest] = useState(false);
+
+    // 📌 Draft Persistence Logic
+    const DRAFT_KEY = `mrs_draft_${room.id}`;
+
+    // Load Draft on Mount
+    useEffect(() => {
+        const saved = localStorage.getItem(DRAFT_KEY);
+        if (saved) {
+            try {
+                const draft = JSON.parse(saved);
+                if (draft.useRange) setUseRange({ ...draft.useRange, startDate: new Date(draft.useRange.startDate), endDate: new Date(draft.useRange.endDate) });
+                if (draft.setupRange) setSetupRange({ ...draft.setupRange, startDate: new Date(draft.setupRange.startDate), endDate: new Date(draft.setupRange.endDate) });
+                if (draft.active) setActive(draft.active);
+                if (draft.title) setTitle(draft.title);
+                if (draft.purpose) setPurpose(draft.purpose);
+                if (draft.guestCount) setGuestCount(draft.guestCount);
+                if (draft.setupStart) setSetupStart(draft.setupStart);
+                if (draft.setupEnd) setSetupEnd(draft.setupEnd);
+                if (draft.startTime) setStartTime(draft.startTime);
+                if (draft.endTime) setEndTime(draft.endTime);
+                if (draft.isCustomGuest) setIsCustomGuest(draft.isCustomGuest);
+                if (draft.step) setStep(draft.step);
+            } catch (e) {
+                console.error("Failed to load draft", e);
+            }
+        }
+    }, [DRAFT_KEY]);
+
+    // Save Draft on Change
+    useEffect(() => {
+        const payload = {
+            useRange,
+            setupRange,
+            active,
+            title,
+            purpose,
+            guestCount,
+            setupStart,
+            setupEnd,
+            startTime,
+            endTime,
+            isCustomGuest,
+            step
+        };
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
+    }, [DRAFT_KEY, useRange, setupRange, active, title, purpose, guestCount, setupStart, setupEnd, startTime, endTime, isCustomGuest, step]);
+
+    const clearDraft = () => {
+        localStorage.removeItem(DRAFT_KEY);
+        setTitle("");
+        setPurpose("");
+        setGuestCount(1);
+        setStep(1);
+        setIsCustomGuest(false);
+        // Reset dates to initial
+        const initial = initialDate ? startOfDay(new Date(initialDate)) : startOfDay(new Date());
+        setUseRange({ key: "use", startDate: initial, endDate: initial });
+        setSetupRange({ key: "setup", startDate: initial, endDate: initial });
+        setSetupStart("08:00");
+        setSetupEnd(initialStartTime || "09:00");
+        setStartTime(initialStartTime || "09:00");
+        setEndTime(initialEndTime || "10:00");
+        
+        showCustomAlert("ล้างข้อมูลสำเร็จ", "แบบร่างของคุณถูกลบออกแล้ว", "info");
+    };
 
     // Custom Alert Modal
     const [alertOpen, setAlertOpen] = useState(false);
@@ -407,6 +472,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 .single();
 
             if (error) throw error;
+
+            // Success -> Clear draft
+            localStorage.removeItem(DRAFT_KEY);
 
             await supabase.from("notifications").insert({
                 user_id: currentUser.id,
@@ -730,22 +798,31 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     )}
                 </div>
 
-                <div className="sticky bottom-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl px-8 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-8 border-t border-slate-100 dark:border-slate-800 flex gap-4">
-                    {step > 1 && (
+                <div className="sticky bottom-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl px-8 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-8 border-t border-slate-100 dark:border-slate-800 flex gap-4 items-center">
+                    <div className="flex gap-2">
                         <button
                             type="button"
-                            onClick={prevStep}
-                            className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-[1.5rem] py-5 font-black text-lg transition-all hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-[0.98]"
+                            onClick={step === 1 ? onClose : prevStep}
+                            className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-[1.5rem] px-8 py-5 font-black text-lg transition-all hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-[0.98]"
                         >
-                            ย้อนกลับ
+                            {step === 1 ? "ยกเลิก" : "ย้อนกลับ"}
                         </button>
-                    )}
+                        
+                        <button
+                            type="button"
+                            onClick={clearDraft}
+                            title="ล้างข้อมูลร่าง"
+                            className="bg-red-50 dark:bg-red-900/20 text-red-500 rounded-[1.5rem] px-5 py-5 font-black text-lg transition-all hover:bg-red-100 dark:hover:bg-red-900/30 active:scale-[0.98] flex items-center justify-center border border-red-100 dark:border-red-900/30"
+                        >
+                            <Trash2 className="w-6 h-6" />
+                        </button>
+                    </div>
 
                     {step < 3 ? (
                         <button
                             type="button"
                             onClick={nextStep}
-                            className="flex-[2] bg-slate-900 dark:bg-indigo-600 text-white rounded-[1.5rem] py-5 font-black text-lg transition-all hover:scale-[1.01] active:scale-[0.98] shadow-xl shadow-indigo-500/20"
+                            className="flex-1 bg-slate-900 dark:bg-indigo-600 text-white rounded-[1.5rem] py-5 font-black text-lg transition-all hover:scale-[1.01] active:scale-[0.98] shadow-xl shadow-indigo-500/20"
                         >
                             ถัดไป
                         </button>
@@ -754,7 +831,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                             type="button"
                             onClick={() => submit()}
                             disabled={loading}
-                            className="flex-[2] bg-indigo-600 dark:bg-indigo-500 text-white rounded-[1.5rem] py-5 font-black text-lg transition-all hover:scale-[1.01] active:scale-[0.98] disabled:opacity-40 flex items-center justify-center gap-3 shadow-xl shadow-indigo-500/30"
+                            className="flex-1 bg-indigo-600 dark:bg-indigo-500 text-white rounded-[1.5rem] py-5 font-black text-lg transition-all hover:scale-[1.01] active:scale-[0.98] disabled:opacity-40 flex items-center justify-center gap-3 shadow-xl shadow-indigo-500/30"
                         >
                             {loading ? (
                                 <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
