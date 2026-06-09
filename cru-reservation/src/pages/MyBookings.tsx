@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { Calendar, Clock, MapPin, Loader2, AlertCircle, Check, X, Users, Info } from 'lucide-react';
+import { Calendar, Clock, MapPin, Loader2, AlertCircle, Check, X, Info } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../lib/auth';
 
@@ -180,17 +180,17 @@ const MyBookings = () => {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">การจองของฉัน</h1>
+                <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">การจองของฉัน</h1>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors">
+            <div>
                 {bookings.length === 0 ? (
-                    <div className="p-20 text-center text-gray-500 dark:text-slate-400 flex flex-col items-center">
-                        <Calendar className="w-16 h-16 mb-4 text-gray-300 dark:text-slate-700" />
-                        <p className="text-lg">คุณยังไม่มีรายการจองห้องประชุม</p>
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-20 text-center text-gray-500 dark:text-slate-400 flex flex-col items-center shadow-sm">
+                        <Calendar className="w-16 h-16 mb-4 text-slate-300 dark:text-slate-700" />
+                        <p className="text-lg font-bold">คุณยังไม่มีรายการจองห้องประชุม</p>
                     </div>
                 ) : (
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    <div className="space-y-4">
                         {bookings.map(booking => {
                             const room = (booking as any).room || (booking as any).rooms;
                             const roomName = room?.name || `ไม่ทราบชื่อห้อง (${booking.room_id.slice(0, 8)})`;
@@ -206,32 +206,32 @@ const MyBookings = () => {
                             return (
                                 <div 
                                     key={booking.id} 
-                                    className="p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
+                                    className="bg-white dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-800/80 p-5 hover:border-indigo-500/40 hover:shadow-lg hover:shadow-indigo-500/5 transition-all duration-300 group cursor-pointer"
                                     onClick={() => {
                                         setActiveDetail(booking);
                                         setDetailOpen(true);
                                     }}
                                 >
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                                        <div className="space-y-2 flex-1">
-                                            <div className="flex items-center gap-3">
-                                                <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+                                        <div className="space-y-3 flex-1 min-w-0">
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                                                     {roomName}
                                                 </h3>
                                                 <span className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${getStatusColor(booking.status)}`}>
                                                     {getStatusThai(booking)}
                                                 </span>
                                             </div>
-                                            <div className="flex flex-col gap-1">
-                                                <p className="text-slate-600 dark:text-slate-300 font-medium">{booking.title}</p>
-                                                <p className="text-slate-500 dark:text-slate-400 text-sm line-clamp-1">{booking.purpose}</p>
+                                            <div className="space-y-1">
+                                                <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{booking.title}</h4>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">{booking.purpose}</p>
                                             </div>
 
                                             {booking.status === 'PENDING' && (
-                                                <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50">
-                                                    <div className="flex items-center justify-between mb-3 text-xs">
-                                                        <span className="font-bold text-slate-500 uppercase tracking-wider">Approval Progress</span>
-                                                        <span className="text-primary-600 dark:text-primary-400 font-medium italic">รอสเตจที่ {booking.current_stage}</span>
+                                                <div className="p-3.5 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800 mt-2">
+                                                    <div className="flex items-center justify-between mb-2 text-[10px]">
+                                                        <span className="font-bold text-slate-400 uppercase tracking-wider">ขั้นตอนการอนุมัติ (Approval Progress)</span>
+                                                        <span className="text-indigo-600 dark:text-indigo-400 font-bold">รอขั้นตอนที่ {booking.current_stage}</span>
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         {(() => {
@@ -241,12 +241,12 @@ const MyBookings = () => {
                                                             return Array.from({ length: totalS }, (_, i) => i + 1).map(sNum => (
                                                                 <React.Fragment key={sNum}>
                                                                     <div className="flex-1">
-                                                                        <div className={`h-2 rounded-full mb-1 transition-all duration-500 ${booking.current_stage > sNum ? 'bg-green-500' : booking.current_stage === sNum ? 'bg-amber-400 animate-pulse' : 'bg-slate-200'}`}></div>
-                                                                        <div className={`text-[10px] text-center ${booking.current_stage >= sNum ? 'font-bold text-slate-700 dark:text-slate-300' : 'text-slate-400'}`}>
-                                                                            {sNum}. {sNum === 1 ? 'พิจารณาขั้นต้น' : 'พิจารณาอนุมัติ'}
+                                                                        <div className={`h-1.5 rounded-full mb-1 transition-all duration-500 ${booking.current_stage > sNum ? 'bg-green-500' : booking.current_stage === sNum ? 'bg-amber-400 animate-pulse' : 'bg-slate-200 dark:bg-slate-800'}`}></div>
+                                                                        <div className={`text-[9px] text-center ${booking.current_stage >= sNum ? 'font-bold text-slate-700 dark:text-slate-300' : 'text-slate-400 dark:text-slate-500'}`}>
+                                                                            {sNum === 1 ? 'พิจารณาขั้นต้น' : 'ผู้อนุมัติสุดท้าย'}
                                                                         </div>
                                                                     </div>
-                                                                    {sNum < totalS && <div className="w-4 h-[1px] bg-slate-200 mb-4"></div>}
+                                                                    {sNum < totalS && <div className="w-4 h-[1px] bg-slate-200 dark:bg-slate-800 mb-3"></div>}
                                                                 </React.Fragment>
                                                             ));
                                                         })()}
@@ -255,20 +255,20 @@ const MyBookings = () => {
                                             )}
 
                                             {rejection && (
-                                                <div className="mt-3 flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/30 rounded-lg">
+                                                <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-955/20 border border-red-100 dark:border-red-900/30 rounded-xl mt-2">
                                                     <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-                                                    <div className="text-sm">
-                                                        <span className="font-bold text-red-700 dark:text-red-400">เหตุผลที่ปฏิเสธ: </span>
+                                                    <div className="text-xs">
+                                                        <span className="font-bold text-red-700 dark:text-red-400">ปฏิเสธเนื่องจาก: </span>
                                                         <span className="text-red-600 dark:text-red-300/80">{rejection.decision_note || 'ไม่ระบุเหตุผล'}</span>
                                                     </div>
                                                 </div>
                                             )}
 
-                                            <div className="mt-4 flex items-center gap-4">
+                                            <div className="pt-2 flex flex-wrap items-center gap-3">
                                                 {booking.status.toUpperCase() === 'PENDING' && (
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleCancel(); }}
-                                                        className="text-xs font-semibold text-red-500 hover:text-red-700 dark:hover:text-red-400 flex items-center gap-1 transition-colors bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded"
+                                                        className="text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-900/30 px-3 py-1.5 rounded-xl transition-colors active:scale-95 duration-150 cursor-pointer"
                                                     >
                                                         ยกเลิกการจอง
                                                     </button>
@@ -279,7 +279,7 @@ const MyBookings = () => {
                                                         setActiveTimeline(booking);
                                                         setTimelineOpen(true);
                                                     }}
-                                                    className="text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400 flex items-center gap-1 transition-colors bg-primary-50 dark:bg-primary-900/20 px-2 py-1 rounded"
+                                                    className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/20 dark:hover:bg-indigo-900/30 px-3 py-1.5 rounded-xl transition-colors active:scale-95 duration-150 cursor-pointer"
                                                 >
                                                     Timeline อนุมัติ
                                                 </button>
@@ -289,24 +289,24 @@ const MyBookings = () => {
                                                         setActiveDetail(booking);
                                                         setDetailOpen(true);
                                                     }}
-                                                    className="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 flex items-center gap-1 transition-colors bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded"
+                                                    className="text-xs font-bold text-slate-600 dark:text-slate-400 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 px-3 py-1.5 rounded-xl transition-colors active:scale-95 duration-150 flex items-center gap-1 cursor-pointer"
                                                 >
-                                                    <Info className="w-3 h-3" /> รายละเอียด
+                                                    <Info className="w-3.5 h-3.5" /> ดูรายละเอียด
                                                 </button>
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-col gap-2 text-[11px] font-black text-slate-500 min-w-fit">
-                                            <div className="flex items-center bg-slate-100/50 dark:bg-slate-800/50 p-2.5 rounded-xl lg:bg-transparent lg:p-0">
-                                                <Calendar className="w-4 h-4 mr-2 text-primary-500" />
+                                        <div className="flex flex-row lg:flex-col flex-wrap lg:flex-nowrap gap-3 text-[11px] font-black text-slate-500 dark:text-slate-400 border-t lg:border-t-0 lg:border-l border-slate-100 dark:border-slate-800 pt-4 lg:pt-0 lg:pl-6 min-w-fit">
+                                            <div className="flex items-center">
+                                                <Calendar className="w-4 h-4 mr-2 text-indigo-500" />
                                                 <span className="uppercase tracking-tight">{format(startDate, 'd MMMM yyyy', { locale: th })}</span>
                                             </div>
-                                            <div className="flex items-center bg-slate-100/50 dark:bg-slate-800/50 p-2.5 rounded-xl lg:bg-transparent lg:p-0">
-                                                <Clock className="w-4 h-4 mr-2 text-primary-500" />
+                                            <div className="flex items-center">
+                                                <Clock className="w-4 h-4 mr-2 text-indigo-500" />
                                                 <span className="uppercase tracking-tight">{format(startDate, 'HH:mm')} - {format(endDate, 'HH:mm')} น.</span>
                                             </div>
-                                            <div className="flex items-center bg-slate-100/50 dark:bg-slate-800/50 p-2.5 rounded-xl lg:bg-transparent lg:p-0">
-                                                <MapPin className="w-4 h-4 mr-2 text-primary-500" />
+                                            <div className="flex items-center">
+                                                <MapPin className="w-4 h-4 mr-2 text-indigo-500" />
                                                 <span className="uppercase tracking-tight truncate max-w-[150px]">{roomLocation}</span>
                                             </div>
                                         </div>
@@ -322,80 +322,145 @@ const MyBookings = () => {
             {detailOpen && activeDetail && (
                 <div className="fixed inset-0 z-[105] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300"
                      onClick={(e) => {
-                         if (e.target === e.currentTarget) setDetailOpen(false);
-                     }}>
-                    <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-8 max-w-xl w-full shadow-2xl transform animate-in zoom-in-95 slide-in-from-bottom-5 duration-300 border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar">
-                        <div className="flex items-start justify-between mb-6">
+                          if (e.target === e.currentTarget) setDetailOpen(false);
+                      }}>
+                    <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 sm:p-8 max-w-xl w-full shadow-2xl transform animate-in zoom-in-95 slide-in-from-bottom-5 duration-300 border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar gap-6">
+                        <div className="flex items-start justify-between">
                             <div>
-                                <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">รายละเอียดการจอง</h3>
+                                <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight">รายละเอียดการจอง</h3>
                                 <div className="mt-2">
                                     <span className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${getStatusColor(activeDetail.status)}`}>
                                         {getStatusThai(activeDetail)}
                                     </span>
                                 </div>
                             </div>
-                            <button onClick={() => setDetailOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
+                            <button onClick={() => setDetailOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer">
                                 <X className="w-6 h-6 text-slate-500" />
                             </button>
                         </div>
 
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 gap-4">
-                                <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">ห้องที่จอง</div>
-                                    <div className="text-lg font-bold text-gray-900 dark:text-white">{(activeDetail as any).room?.name || 'ไม่ระบุห้อง'}</div>
-                                    <div className="text-sm text-slate-500">{(activeDetail as any).room?.location || 'ไม่ระบุสถานที่'}</div>
+                        <div className="space-y-5">
+                            <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">ห้องที่จอง</div>
+                                <div className="text-lg font-bold text-gray-900 dark:text-white">{(activeDetail as any).room?.name || 'ไม่ระบุห้อง'}</div>
+                                <div className="text-sm text-slate-500">{(activeDetail as any).room?.location || 'ไม่ระบุสถานที่'}</div>
+                            </div>
+
+                            <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">หัวข้อและวัตถุประสงค์</div>
+                                <div className="text-base font-bold text-gray-900 dark:text-white mb-2">{activeDetail.title}</div>
+                                <div className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{activeDetail.purpose}</div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="bg-indigo-50 dark:bg-indigo-950/20 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-900/30">
+                                    <div className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-1">วันและเวลาใช้งานจริง</div>
+                                    <div className="text-sm font-bold text-indigo-900 dark:text-white mb-1">
+                                        {format(new Date(activeDetail.start_at), 'd MMM yyyy', { locale: th })} 
+                                        {format(new Date(activeDetail.start_at), 'd MMM yyyy') !== format(new Date(activeDetail.end_at), 'd MMM yyyy') && 
+                                            ` - ${format(new Date(activeDetail.end_at), 'd MMM yyyy', { locale: th })}`
+                                        }
+                                    </div>
+                                    <div className="text-xs text-indigo-700 dark:text-indigo-300">
+                                        {format(new Date(activeDetail.start_at), 'HH:mm')} - {format(new Date(activeDetail.end_at), 'HH:mm')} น.
+                                    </div>
                                 </div>
 
-                                <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">หัวข้อและวัตถุประสงค์</div>
-                                    <div className="text-base font-bold text-gray-900 dark:text-white mb-2">{activeDetail.title}</div>
-                                    <div className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{activeDetail.purpose}</div>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="bg-indigo-50 dark:bg-indigo-900/10 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-800/50">
-                                        <div className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-1">วันและเวลาใช้งานจริง</div>
-                                        <div className="text-sm font-bold text-indigo-900 dark:text-white mb-1">
-                                            {format(new Date(activeDetail.start_at), 'd MMM yyyy', { locale: th })} 
-                                            {format(new Date(activeDetail.start_at), 'd MMM yyyy') !== format(new Date(activeDetail.end_at), 'd MMM yyyy') && 
-                                                ` - ${format(new Date(activeDetail.end_at), 'd MMM yyyy', { locale: th })}`
+                                {activeDetail.setup_start_at ? (
+                                    <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-2xl border border-yellow-100 dark:border-yellow-900/30">
+                                        <div className="text-[10px] font-black text-yellow-600 dark:text-yellow-400 uppercase tracking-widest mb-1">จัดเตรียมห้องล่วงหน้า</div>
+                                        <div className="text-sm font-bold text-yellow-900 dark:text-white mb-1">
+                                            {format(new Date(activeDetail.setup_start_at), 'd MMM yyyy', { locale: th })}
+                                            {activeDetail.setup_end_at && format(new Date(activeDetail.setup_start_at), 'd MMM yyyy') !== format(new Date(activeDetail.setup_end_at), 'd MMM yyyy') && 
+                                                ` - ${format(new Date(activeDetail.setup_end_at), 'd MMM yyyy', { locale: th })}`
                                             }
                                         </div>
-                                        <div className="text-xs text-indigo-700 dark:text-indigo-300">
-                                            {format(new Date(activeDetail.start_at), 'HH:mm')} - {format(new Date(activeDetail.end_at), 'HH:mm')} น.
+                                        <div className="text-xs text-yellow-700 dark:text-yellow-300">
+                                            {format(new Date(activeDetail.setup_start_at), 'HH:mm')} - {activeDetail.setup_end_at ? format(new Date(activeDetail.setup_end_at), 'HH:mm') : 'เสร็จสิ้นก่อนเริ่มงาน'} น.
                                         </div>
                                     </div>
+                                ) : (
+                                    <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 opacity-60">
+                                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">การจัดเตรียมห้องล่วงหน้า</div>
+                                        <div className="text-sm font-bold text-slate-500 dark:text-slate-400 mt-2">ไม่ต้องการเวลาจัดเตรียม</div>
+                                    </div>
+                                )}
+                            </div>
 
-                                    {activeDetail.setup_start_at ? (
-                                        <div className="bg-yellow-50 dark:bg-yellow-900/10 p-4 rounded-2xl border border-yellow-100 dark:border-yellow-800/50">
-                                            <div className="text-[10px] font-black text-yellow-600 dark:text-yellow-400 uppercase tracking-widest mb-1">จัดเตรียมห้องล่วงหน้า</div>
-                                            <div className="text-sm font-bold text-yellow-900 dark:text-white mb-1">
-                                                {format(new Date(activeDetail.setup_start_at), 'd MMM yyyy', { locale: th })}
-                                                {activeDetail.setup_end_at && format(new Date(activeDetail.setup_start_at), 'd MMM yyyy') !== format(new Date(activeDetail.setup_end_at), 'd MMM yyyy') && 
-                                                    ` - ${format(new Date(activeDetail.setup_end_at), 'd MMM yyyy', { locale: th })}`
-                                                }
-                                            </div>
-                                            <div className="text-xs text-yellow-700 dark:text-yellow-300">
-                                                {format(new Date(activeDetail.setup_start_at), 'HH:mm')} - {activeDetail.setup_end_at ? format(new Date(activeDetail.setup_end_at), 'HH:mm') : 'เสร็จสิ้นก่อนเริ่มงาน'} น.
-                                            </div>
+                            {/* Integrated Approval Timeline */}
+                            <div className="bg-slate-50 dark:bg-slate-850 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+                                <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">ลำดับขั้นตอนการอนุมัติ</div>
+                                <div className="relative border-l-2 border-slate-200 dark:border-slate-800 ml-3 pl-6 space-y-6 pb-2">
+                                    {/* Step 1: Requested */}
+                                    <div className="relative">
+                                        <div className="absolute -left-[31px] top-1 w-3 h-3 rounded-full bg-indigo-500 ring-4 ring-indigo-100 dark:ring-indigo-950"></div>
+                                        <div className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-0.5">ส่งคำขอจอง</div>
+                                        <div className="text-sm font-bold text-gray-900 dark:text-white">ผู้ขอใช้: {user?.user_metadata?.full_name || 'คุณ (ผู้จอง)'}</div>
+                                        <div className="text-[10px] text-slate-500">{format(new Date(activeDetail.created_at), 'd MMM yyyy HH:mm', { locale: th })} น.</div>
+                                    </div>
+
+                                    {/* Approval Steps */}
+                                    {activeDetail.reservation_approvals && activeDetail.reservation_approvals.length > 0 ? (
+                                        [...activeDetail.reservation_approvals].sort((a, b) => a.stage_no - b.stage_no).map((approval) => {
+                                            const isApproved = approval.decision === 'APPROVED';
+                                            return (
+                                                <div key={approval.id} className="relative">
+                                                    <div className={`absolute -left-[31px] top-1 w-3 h-3 rounded-full ring-4 dark:ring-slate-950 ${isApproved ? 'bg-emerald-500 ring-emerald-100' : 'bg-red-500 ring-red-100'}`}></div>
+                                                    <div className={`text-[9px] font-black uppercase tracking-wider mb-0.5 ${isApproved ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                        {isApproved ? `อนุมัติขั้นตอนที่ ${approval.stage_no}` : `ปฏิเสธขั้นตอนที่ ${approval.stage_no}`}
+                                                    </div>
+                                                    <div className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                                                        {approval.approver?.avatar_url && (
+                                                            <img src={approval.approver.avatar_url} className="w-4 h-4 rounded-full object-cover" alt="" />
+                                                        )}
+                                                        โดย: {approval.approver?.display_name || 'เจ้าหน้าที่'}
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-500">{format(new Date(approval.decided_at), 'd MMM yyyy HH:mm', { locale: th })} น.</div>
+                                                    {approval.decision_note && (
+                                                        <div className="mt-1.5 p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 italic">
+                                                            "{approval.decision_note}"
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    ) : null}
+
+                                    {/* Next Pending step */}
+                                    {activeDetail.status === 'PENDING' && (
+                                        <div className="relative opacity-60">
+                                            <div className="absolute -left-[31px] top-1 w-3 h-3 rounded-full bg-slate-300 dark:bg-slate-700"></div>
+                                            <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-0.5">ขั้นตอนถัดไป</div>
+                                            <div className="text-sm font-bold text-slate-500 italic">รอพิจารณาอนุมัติ (ขั้นที่ {activeDetail.current_stage})...</div>
                                         </div>
-                                    ) : (
-                                        <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 opacity-60">
-                                            <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">การจัดเตรียมห้องล่วงหน้า</div>
-                                            <div className="text-sm font-bold text-slate-500 dark:text-slate-400 mt-2">ไม่ต้องการเวลาจัดเตรียม</div>
+                                    )}
+
+                                    {/* Final Status */}
+                                    {activeDetail.status === 'APPROVED' && (
+                                        <div className="relative">
+                                            <div className="absolute -left-[31px] top-1 w-3 h-3 rounded-full bg-emerald-600 ring-4 ring-emerald-100 dark:ring-emerald-950"></div>
+                                            <div className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-0.5">เสร็จสมบูรณ์</div>
+                                            <div className="text-sm font-bold text-emerald-700 dark:text-emerald-400">การจองเสร็จสมบูรณ์ (อนุมัติแล้ว)</div>
+                                        </div>
+                                    )}
+
+                                    {activeDetail.status === 'CANCELLED' && (
+                                        <div className="relative">
+                                            <div className="absolute -left-[31px] top-1 w-3 h-3 rounded-full bg-red-600 ring-4 ring-red-100 dark:ring-red-950"></div>
+                                            <div className="text-[9px] font-black text-red-600 dark:text-red-400 uppercase tracking-wider mb-0.5">ยกเลิกแล้ว</div>
+                                            <div className="text-sm font-bold text-red-700 dark:text-red-400">รายการนี้ถูกยกเลิกแล้ว</div>
                                         </div>
                                     )}
                                 </div>
                             </div>
                         </div>
 
-                        <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
+                        <div className="mt-2 border-t border-slate-100 dark:border-slate-800 pt-5 flex justify-end">
                             <button
                                 onClick={() => setDetailOpen(false)}
-                                className="px-6 py-3 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl font-bold transition-transform active:scale-95"
+                                className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 text-white dark:text-slate-900 rounded-xl font-bold transition-all active:scale-95 cursor-pointer text-sm shadow-sm"
                             >
-                                ปิด
+                                ปิดหน้าต่าง
                             </button>
                         </div>
                     </div>
@@ -406,12 +471,12 @@ const MyBookings = () => {
             {timelineOpen && activeTimeline && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300"
                      onClick={(e) => {
-                         if (e.target === e.currentTarget) setTimelineOpen(false);
-                     }}>
+                          if (e.target === e.currentTarget) setTimelineOpen(false);
+                      }}>
                     <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 max-w-lg w-full shadow-2xl transform animate-in zoom-in-95 slide-in-from-bottom-10 duration-300 border border-white/20 dark:border-slate-800 flex flex-col max-h-[90vh]">
                         <div className="flex items-center justify-between mb-8">
                             <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Timeline การอนุมัติ</h3>
-                            <button onClick={() => setTimelineOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
+                            <button onClick={() => setTimelineOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer">
                                 <X className="w-6 h-6 text-slate-500" />
                             </button>
                         </div>
@@ -448,7 +513,7 @@ const MyBookings = () => {
                                                     </p>
                                                     {approval.decision_note && (
                                                         <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-800/100 border border-slate-100 dark:border-slate-800 rounded-2xl">
-                                                            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed italic italic">"{approval.decision_note}"</p>
+                                                            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed italic">"{approval.decision_note}"</p>
                                                         </div>
                                                     )}
                                                 </div>
@@ -477,7 +542,7 @@ const MyBookings = () => {
                         <div className="mt-8">
                             <button
                                 onClick={() => setTimelineOpen(false)}
-                                className="w-full py-5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-[2rem] font-black text-xl transition-all active:scale-95"
+                                className="w-full py-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-[2rem] font-black text-lg transition-all active:scale-95 cursor-pointer"
                             >
                                 ปิดหน้าต่าง
                             </button>
@@ -518,13 +583,13 @@ const MyBookings = () => {
                                                 if (pendingAction) executeCancel(pendingAction.id);
                                                 setAlertOpen(false);
                                             }}
-                                            className="w-full py-5 bg-red-600 hover:bg-red-700 text-white rounded-3xl font-black text-xl shadow-xl shadow-red-200 dark:shadow-none transition-all active:scale-95"
+                                            className="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-3xl font-black text-lg shadow-xl shadow-red-200 dark:shadow-none transition-all active:scale-95 cursor-pointer"
                                         >
                                             ยืนยันยกเลิก
                                         </button>
                                         <button
                                             onClick={() => setAlertOpen(false)}
-                                            className="w-full py-5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-3xl font-black text-xl transition-all active:scale-95"
+                                            className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-3xl font-black text-lg transition-all active:scale-95 cursor-pointer"
                                         >
                                             ย้อนกลับ
                                         </button>
@@ -532,7 +597,7 @@ const MyBookings = () => {
                                 ) : (
                                     <button
                                         onClick={() => setAlertOpen(false)}
-                                        className={`w-full py-5 rounded-3xl font-black text-xl text-white transition-all active:scale-95 shadow-xl ${alertType === 'success' ? 'bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700' :
+                                        className={`w-full py-4 rounded-3xl font-black text-lg text-white transition-all active:scale-95 shadow-xl cursor-pointer ${alertType === 'success' ? 'bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700' :
                                             alertType === 'error' ? 'bg-red-600 shadow-red-200 hover:bg-red-700' :
                                                 alertType === 'warning' ? 'bg-amber-500 shadow-amber-200 hover:bg-amber-600' :
                                                     'bg-primary-600 shadow-primary-200 hover:bg-primary-700'

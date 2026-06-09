@@ -151,8 +151,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
         endDate: initialDate ? startOfDay(new Date(initialDate)) : startOfDay(new Date()),
     });
 
+    const [setupType, setSetupType] = useState<"none" | "same_day" | "diff_day">("none");
     const [active, setActive] = useState<"use" | "setup">("use");
-    const [needsSetup, setNeedsSetup] = useState(false);
+    const needsSetup = setupType !== "none";
 
     const [setupStart, setSetupStart] = useState("08:00");
     const [setupEnd, setSetupEnd] = useState(initialStartTime || "09:00");
@@ -170,6 +171,17 @@ const BookingModal: React.FC<BookingModalProps> = ({
     const [showSuccess, setShowSuccess] = useState(false);
     const [existingReservations, setExistingReservations] = useState<any[]>([]);
 
+    // Sync same-day setup range with use range start date
+    useEffect(() => {
+        if (setupType === "same_day" && useRange.startDate) {
+            setSetupRange({
+                key: "setup",
+                startDate: useRange.startDate,
+                endDate: useRange.startDate
+            });
+        }
+    }, [useRange.startDate, setupType]);
+
     // 📌 Draft Persistence Logic
     const DRAFT_KEY = `mrs_draft_v3_${room.id}`;
 
@@ -181,7 +193,15 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 if (draft.useRange) setUseRange({ ...draft.useRange, startDate: new Date(draft.useRange.startDate), endDate: new Date(draft.useRange.endDate) });
                 if (draft.setupRange) setSetupRange({ ...draft.setupRange, startDate: new Date(draft.setupRange.startDate), endDate: new Date(draft.setupRange.endDate) });
                 if (draft.active) setActive(draft.active);
-                if (draft.needsSetup !== undefined) setNeedsSetup(draft.needsSetup);
+                if (draft.setupType) {
+                    setSetupType(draft.setupType);
+                } else if (draft.needsSetup) {
+                    const isSame = draft.setupRange?.startDate && draft.useRange?.startDate && 
+                        dayjs(draft.setupRange.startDate).isSame(dayjs(draft.useRange.startDate), 'day');
+                    setSetupType(isSame ? "same_day" : "diff_day");
+                } else {
+                    setSetupType("none");
+                }
                 if (draft.title) setTitle(draft.title);
                 if (draft.purpose) setPurpose(draft.purpose);
                 if (draft.guestCount) setGuestCount(draft.guestCount);
@@ -203,6 +223,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
             setupRange,
             active,
             needsSetup,
+            setupType,
             title,
             purpose,
             guestCount,
@@ -214,7 +235,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
             step
         };
         localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
-    }, [DRAFT_KEY, useRange, setupRange, active, needsSetup, title, purpose, guestCount, startTime, endTime, setupStart, setupEnd, isCustomGuest, step]);
+    }, [DRAFT_KEY, useRange, setupRange, active, needsSetup, setupType, title, purpose, guestCount, startTime, endTime, setupStart, setupEnd, isCustomGuest, step]);
 
     // Custom Alert Modal
     const [alertOpen, setAlertOpen] = useState(false);
@@ -263,12 +284,13 @@ const BookingModal: React.FC<BookingModalProps> = ({
     const labelSetup = useMemo(() => fmtRange(setupStartDate, setupEndDate), [setupStartDate, setupEndDate]);
 
     const handleSelect = (ranges: RangeKeyDict) => {
-        const { use, setup } = ranges;
-        const target = active === "use" ? use : setup;
-        const setter = active === "use" ? setUseRange : setSetupRange;
-
+        const target = ranges.use;
         if (!target?.startDate || !target?.endDate) return;
-        setter({ key: active, startDate: target.startDate, endDate: target.endDate });
+        setUseRange({
+            key: "use",
+            startDate: target.startDate,
+            endDate: target.endDate
+        });
     };
 
     const fetchExisting = async () => {
@@ -329,6 +351,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 const setE = timeToMinutes(setupEnd);
                 if (!Number.isFinite(setS) || !Number.isFinite(setE)) return "เวลาจัดเตรียมไม่ถูกต้อง";
                 if (dayjs(setupStartDate).isSame(dayjs(setupEndDate), 'day') && setS >= setE) return "เวลาจัดเตรียม: เวลาเริ่มต้องน้อยกว่าเวลาสิ้นสุดในวันเดียวกัน";
+                if (dayjs(setupStartDate).isAfter(dayjs(useStart), 'day')) return "วันจัดเตรียมห้องต้องไม่เกิดขึ้นหลังวันเริ่มงานจริง";
 
                 // Validation: Setup must finish before or exactly when event starts
                 const endOfSetup = dayjs(buildISO(setupEndDate, setupEnd, true));
@@ -434,6 +457,19 @@ const BookingModal: React.FC<BookingModalProps> = ({
             setLoading(false);
         }
     };
+    const todayStr = dayjs().format("YYYY-MM-DD");
+    const eventStartStr = useRange.startDate ? dayjs(useRange.startDate).format("YYYY-MM-DD") : "";
+    const setupDateStr = setupRange.startDate ? dayjs(setupRange.startDate).format("YYYY-MM-DD") : "";
+
+    const handleSetupDateChange = (val: string) => {
+        if (!val) return;
+        const d = startOfDay(new Date(val));
+        setSetupRange({
+            key: "setup",
+            startDate: d,
+            endDate: d
+        });
+    };
 
     return (
         <div
@@ -486,29 +522,14 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 <div className="flex flex-col gap-6 px-5 sm:px-8 py-6 sm:py-8 overflow-y-auto custom-scrollbar flex-1">
                     {step === 1 && (
                         <div className="animate-in slide-in-from-right-4 duration-300">
-                            <div className="flex flex-col md:flex-row gap-8">
+                            <div className="flex flex-col lg:flex-row gap-8 items-start">
                                 {/* Calendar Column */}
-                                <div className="flex-1 max-w-[420px] mx-auto w-full bg-slate-50/50 dark:bg-slate-800/20 rounded-3xl p-4 border border-slate-100 dark:border-slate-700/30 overflow-hidden flex flex-col items-center shadow-sm">
-                                    <div className="grid grid-cols-2 p-1 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl mb-4 w-full max-w-[280px]">
-                                        <button
-                                            type="button"
-                                            onClick={() => { setNeedsSetup(true); setActive("setup"); }}
-                                            className={`py-2 rounded-lg text-sm font-black transition-all ${active === "setup" && needsSetup ? "bg-white dark:bg-slate-800 text-yellow-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
-                                        >
-                                            จัดเตรียม
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setActive("use")}
-                                            className={`py-2 rounded-lg text-sm font-black transition-all ${active === "use" ? "bg-white dark:bg-slate-800 text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
-                                        >
-                                            วันใช้จริง
-                                        </button>
-                                    </div>
-                                    <div className="w-full flex justify-center transform scale-100 origin-top mb-4 rounded-2xl overflow-hidden shadow-sm">
+                                <div className="flex-1 max-w-[420px] mx-auto lg:mx-0 w-full bg-slate-50/50 dark:bg-slate-800/20 rounded-3xl p-5 border border-slate-100 dark:border-slate-700/30 flex flex-col items-center shadow-sm">
+                                    <div className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3 self-start pl-1">เลือกวันจัดกิจกรรมหลัก</div>
+                                    <div className="w-full flex justify-center rounded-2xl bg-white dark:bg-slate-900/40 p-1 shadow-inner overflow-visible">
                                         <DateRange
                                             locale={th}
-                                            ranges={active === "use" ? [useRange, setupRange] : [setupRange, useRange]}
+                                            ranges={[useRange]}
                                             onChange={handleSelect}
                                             focusedRange={[0, 0]}
                                             disabledDates={[...Array.from(busyDateStrings).map(s => dayjs(s).toDate())]}
@@ -516,8 +537,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                                             months={1}
                                             direction="vertical"
                                             showDateDisplay={false}
-                                            rangeColors={active === "use" ? ["#4f46e5", "#f59e0b"] : ["#f59e0b", "#4f46e5"]}
-                                            dragSelectionEnabled={true}
+                                            rangeColors={["#4f46e5"]}
                                             // @ts-ignore
                                             preventSnapRefocus={true}
                                             dayContentRenderer={(day: Date) => {
@@ -539,13 +559,14 @@ const BookingModal: React.FC<BookingModalProps> = ({
                                         />
                                     </div>
 
-                                    <div className="w-full text-center py-2 text-xs border-t border-slate-100 dark:border-slate-800 mt-1 bg-white dark:bg-slate-900/50 rounded-xl shadow-sm text-slate-500">
+                                    <div className="w-full text-center py-2 text-xs border-t border-slate-100 dark:border-slate-800 mt-4 bg-white dark:bg-slate-900/50 rounded-xl shadow-sm text-slate-500">
                                         💡 สามารถคลิกลากเพื่อเลือกแบบหลายวันติดกันได้
                                     </div>
                                 </div>
 
-                                {/* Time Selection Column */}
-                                <div className="flex-[0.8] flex flex-col gap-6 w-full">
+                                {/* Selection Column (Time & Setup Options) */}
+                                <div className="flex-1 flex flex-col gap-6 w-full">
+                                    {/* Actual Event Time Card */}
                                     <div className="bg-indigo-50/40 dark:bg-indigo-900/5 border border-indigo-100 dark:border-indigo-900/20 rounded-2xl p-5 flex flex-col gap-4 shadow-sm">
                                         <div className="flex flex-col gap-1 items-center border-b border-indigo-100/50 pb-3">
                                             <div className="text-xs font-black text-indigo-600 uppercase tracking-widest text-center">เวลาใช้งานจริง</div>
@@ -557,41 +578,82 @@ const BookingModal: React.FC<BookingModalProps> = ({
                                         </div>
                                     </div>
 
-                                    <div className={`rounded-2xl p-5 flex flex-col gap-4 transition-all shadow-sm border ${needsSetup ? "bg-yellow-50/40 dark:bg-yellow-900/5 border-yellow-200" : "bg-slate-50 border-slate-200"}`}>
-                                        <div className="flex items-center justify-between border-b border-yellow-100/50 pb-3">
-                                            <div className="flex flex-col gap-1">
-                                                <div className="text-xs font-black text-yellow-600 uppercase tracking-widest">การเตรียมห้องล่วงหน้า</div>
-                                                {needsSetup && <div className="text-sm font-bold text-slate-800 dark:text-white">{labelSetup}</div>}
-                                            </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input 
-                                                    type="checkbox" 
-                                                    className="sr-only peer"
-                                                    checked={needsSetup}
-                                                    onChange={(e) => {
-                                                        setNeedsSetup(e.target.checked);
-                                                        if (e.target.checked && active !== "setup") {
-                                                            setActive("setup");
-                                                        }
-                                                    }}
-                                                />
-                                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-yellow-500"></div>
-                                            </label>
+                                    {/* Setup Selection Card */}
+                                    <div className="bg-slate-50 dark:bg-slate-800/10 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex flex-col gap-5 shadow-sm">
+                                        <div className="text-xs font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest border-b border-slate-200/50 dark:border-slate-800 pb-2">การจัดเตรียมห้อง (Setup)</div>
+                                        <div className="grid grid-cols-1 gap-2.5">
+                                            {/* Option 1: None */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setSetupType("none")}
+                                                className={`flex flex-col items-start p-3.5 rounded-2xl border-2 text-left transition-all ${setupType === "none" ? "border-indigo-600 bg-indigo-50/20 dark:bg-indigo-950/20" : "border-slate-200 dark:border-slate-800 hover:border-slate-300 bg-white dark:bg-slate-900/50"}`}
+                                            >
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white">ไม่ต้องการเตรียมห้องล่วงหน้า</span>
+                                                <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">จัดเตรียมในเวลาใช้จริง หรือสัมมนาแบบทั่วไป</span>
+                                            </button>
+
+                                            {/* Option 2: Same Day */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setSetupType("same_day")}
+                                                className={`flex flex-col items-start p-3.5 rounded-2xl border-2 text-left transition-all ${setupType === "same_day" ? "border-yellow-500 bg-yellow-50/20 dark:bg-yellow-950/20" : "border-slate-200 dark:border-slate-800 hover:border-slate-300 bg-white dark:bg-slate-900/50"}`}
+                                            >
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white">เตรียมห้องในวันเดียวกัน</span>
+                                                <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">จองเวลาเพิ่มเติมในวันจัดกิจกรรมจริง (เช่น โต๊ะ, เครื่องเสียง)</span>
+                                            </button>
+
+                                            {/* Option 3: Different Day */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setSetupType("diff_day")}
+                                                className={`flex flex-col items-start p-3.5 rounded-2xl border-2 text-left transition-all ${setupType === "diff_day" ? "border-yellow-500 bg-yellow-50/20 dark:bg-yellow-950/20" : "border-slate-200 dark:border-slate-800 hover:border-slate-300 bg-white dark:bg-slate-900/50"}`}
+                                            >
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white">ระบุวันจัดเตรียมอื่นแยกต่างหาก</span>
+                                                <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">จองเพื่อจัดเตรียมห้องข้ามวัน (เช่น จัดล่วงหน้า 1 วัน)</span>
+                                            </button>
                                         </div>
-                                        <div className={`grid grid-cols-2 gap-4 transition-all duration-300 ${needsSetup ? "opacity-100" : "opacity-30 pointer-events-none"}`}>
-                                            <CustomTimePicker value={setupStart} onChange={setSetupStart} label="เริ่มเตรียม" colorClass="yellow" />
-                                            <CustomTimePicker value={setupEnd} onChange={setSetupEnd} label="สิ้นสุด" colorClass="yellow" />
-                                        </div>
+
+                                        {/* Setup Details (Shown if setup selected) */}
                                         {needsSetup && (
-                                            <div className="text-xs text-yellow-600/80 font-medium text-center bg-yellow-100/30 p-2 rounded-lg">
-                                                * ควรเลือกเวลาที่เสร็จสิ้นก่อนเริ่มกิจกรรมจริง
+                                            <div className="border-t border-slate-200 dark:border-slate-800 pt-4 flex flex-col gap-4 animate-in slide-in-from-top-3 duration-300">
+                                                {/* Date Picker (For different day setup) */}
+                                                {setupType === "diff_day" && (
+                                                    <div className="flex flex-col gap-1.5">
+                                                        <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">
+                                                            วันที่จัดเตรียมห้อง
+                                                        </label>
+                                                        <input
+                                                            type="date"
+                                                            value={setupDateStr}
+                                                            onChange={(e) => handleSetupDateChange(e.target.value)}
+                                                            min={todayStr}
+                                                            max={eventStartStr}
+                                                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold dark:text-white focus:border-indigo-500 outline-none transition-all shadow-sm"
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                {/* Setup Time Pickers */}
+                                                <div className="flex flex-col gap-1.5">
+                                                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">
+                                                        เวลาจัดเตรียม ({setupType === "same_day" ? "จัดเตรียมวันเดียวกัน" : "จัดเตรียมแยกวัน"})
+                                                    </label>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <CustomTimePicker value={setupStart} onChange={setSetupStart} label="เริ่มเตรียม" colorClass="yellow" />
+                                                        <CustomTimePicker value={setupEnd} onChange={setSetupEnd} label="สิ้นสุด" colorClass="yellow" />
+                                                    </div>
+                                                </div>
+
+                                                <div className="text-xs text-yellow-600/90 font-medium text-center bg-yellow-500/10 p-2.5 rounded-xl border border-yellow-500/10">
+                                                    * เวลาเตรียมห้องต้องเสร็จสิ้นก่อนเริ่มกิจกรรมจริง
+                                                </div>
                                             </div>
                                         )}
                                     </div>
                                     
                                     {hasConflict && (
-                                        <div className="p-3 bg-red-50 text-red-600 text-center font-bold rounded-2xl border border-red-100 animate-pulse text-sm">
-                                            ⚠️ ช่วงเวลานี้ถูกจองไปแล้ว
+                                        <div className="p-3.5 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 text-center font-black rounded-2xl border border-red-200 dark:border-red-800/20 animate-pulse text-sm">
+                                            ⚠️ ช่วงเวลานี้ถูกจองไปแล้ว กรุณาเลือกเวลาอื่น
                                         </div>
                                     )}
                                 </div>
