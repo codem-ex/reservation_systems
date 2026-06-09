@@ -91,9 +91,8 @@ export default function UserGuide() {
                                     <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
                                         <div className="text-xs font-bold text-amber-600 mb-2 underline decoration-2">ขั้นที่ 1: วันและเวลา</div>
                                         <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                                            เลือกช่วงเวลาจัดเตรียมสถานที่และเวลาใช้งานจริง ปฏิทินจะแสดงสีส้มและน้ำเงินเพื่อให้เห็นภาพรวมที่ชัดเจน
+                                            เลือกวันและเวลาที่ใช้งานจริงเป็นหลัก และหากต้องการจัดสถานที่ล่วงหน้า สามารถเปิดสวิตช์ "ต้องการเวลาจัดเตรียมห้อง" ได้เลย
                                         </p>
-                                        <p className="mt-2 text-[9px] text-red-500 font-bold">* วันที่เตรียมห้ามอยู่หลังวันที่ใช้งานจริง</p>
                                     </div>
                                     <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
                                         <div className="text-xs font-bold text-amber-600 mb-2 underline decoration-2">ขั้นที่ 2: กรอกข้อมูล</div>

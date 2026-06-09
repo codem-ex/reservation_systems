@@ -13,39 +13,60 @@
   This is standard Tailwind v4 syntax and safe to ignore.
 */
 @theme {
-  --color-primary-50: var(--color-indigo-50);
-  --color-primary-100: var(--color-indigo-100);
-  --color-primary-200: var(--color-indigo-200);
-  --color-primary-300: var(--color-indigo-300);
-  --color-primary-400: var(--color-indigo-400);
-  --color-primary-500: var(--color-indigo-500);
-  --color-primary-600: var(--color-indigo-600);
-  --color-primary-700: var(--color-indigo-700);
-  --color-primary-800: var(--color-indigo-800);
-  --color-primary-900: var(--color-indigo-900);
-  --color-primary-950: var(--color-indigo-950);
+  /* 
+    📐 Fluid Typography Scale
+    Scales smoothly between mobile and desktop using clamp()
+  */
+  --text-xs: clamp(0.75rem, 0.7vw + 0.6rem, 0.875rem);
+  --text-sm: clamp(0.875rem, 0.8vw + 0.7rem, 1rem);
+  --text-base: clamp(1rem, 1vw + 0.8rem, 1.125rem);
+  --text-lg: clamp(1.125rem, 1.2vw + 0.9rem, 1.25rem);
+  --text-xl: clamp(1.25rem, 1.5vw + 1rem, 1.5rem);
+  --text-2xl: clamp(1.5rem, 2vw + 1.2rem, 1.875rem);
+  --text-3xl: clamp(1.875rem, 2.5vw + 1.5rem, 2.25rem);
+  --text-4xl: clamp(2.25rem, 3vw + 1.8rem, 3rem);
+
+  /* 
+    🌈 Primary Brand Color (OKLCH Indigo hue: ~270) 
+    OKLCH provides perceptual uniformity and better WCAG contrast.
+  */
+  --color-primary-50: oklch(0.97 0.02 270);
+  --color-primary-100: oklch(0.93 0.04 270);
+  --color-primary-200: oklch(0.88 0.08 270);
+  --color-primary-300: oklch(0.82 0.12 270);
+  --color-primary-400: oklch(0.74 0.16 270);
+  --color-primary-500: oklch(0.64 0.20 270); /* Brand default */
+  --color-primary-600: oklch(0.54 0.18 270);
+  --color-primary-700: oklch(0.45 0.15 270);
+  --color-primary-800: oklch(0.38 0.12 270);
+  --color-primary-900: oklch(0.32 0.10 270);
+  --color-primary-950: oklch(0.25 0.08 270);
 }
 
 @layer base {
   :root {
-    --background: #f8fafc;
-    /* bg-slate-50 */
-    --foreground: #0f172a;
-    /* text-slate-900 */
-    --card: #ffffff;
-    --border: #e2e8f0;
-    /* slate-200 */
+    /* Light mode: tinted neutral toward brand hue */
+    --background: oklch(0.98 0.005 270);
+    --foreground: oklch(0.20 0.02 270);
+    --card: oklch(1 0 0);
+    --border: oklch(0.92 0.01 270);
+    
+    /* Semantic variables for Impeccable system */
+    --color-surface: var(--card);
+    --color-ink: var(--foreground);
+    --color-ink-muted: oklch(0.55 0.02 270);
   }
 
   .dark {
-    --background: #020617;
-    /* bg-slate-950 */
-    --foreground: #f8fafc;
-    /* text-slate-100 */
-    --card: #0f172a;
-    /* bg-slate-900 */
-    --border: #1e293b;
-    /* slate-800 */
+    /* Dark mode: deep saturated darks */
+    --background: oklch(0.18 0.02 270);
+    --foreground: oklch(0.98 0.01 270);
+    --card: oklch(0.22 0.03 270);
+    --border: oklch(0.30 0.03 270);
+    
+    --color-surface: var(--card);
+    --color-ink: var(--foreground);
+    --color-ink-muted: oklch(0.70 0.02 270);
   }
 
   body {
