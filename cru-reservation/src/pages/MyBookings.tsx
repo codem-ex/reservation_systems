@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { Calendar, Clock, MapPin, Loader2, AlertCircle, Check, X } from 'lucide-react';
+import { Calendar, Clock, MapPin, Loader2, AlertCircle, Check, X, Users, Info } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../lib/auth';
 
@@ -51,9 +51,12 @@ const MyBookings = () => {
     const [alertType, setAlertType] = useState<"info" | "success" | "warning" | "error" | "confirm">("info");
     const [pendingAction, setPendingAction] = useState<{ id: string } | null>(null);
 
-    // Timeline State
+    // Timeline & Detail State
     const [timelineOpen, setTimelineOpen] = useState(false);
     const [activeTimeline, setActiveTimeline] = useState<Reservation | null>(null);
+
+    const [detailOpen, setDetailOpen] = useState(false);
+    const [activeDetail, setActiveDetail] = useState<Reservation | null>(null);
 
     const showCustomAlert = (title: string, message: string, type: "info" | "success" | "warning" | "error" | "confirm" = "info", target?: { id: string }) => {
         setAlertTitle(title);
@@ -131,11 +134,11 @@ const MyBookings = () => {
         if (s === 'REJECTED') return 'ปฏิเสธ';
         if (s === 'CANCELLED') return 'ยกเลิกแล้ว';
         if (s === 'PENDING') {
-            // Simplified: Stage info
             return `รออนุมัติ (ขั้นที่ ${booking.current_stage || 1})`;
         }
         return booking.status;
     };
+
     const executeCancel = async (id: string) => {
         try {
             const { error } = await supabase
@@ -144,10 +147,8 @@ const MyBookings = () => {
                 .eq('id', id);
             if (error) throw error;
 
-            // Create notification for admin
             const { data: admins } = await supabase.from("profiles").select("id").eq("is_admin", true);
             if (admins && admins.length > 0) {
-                // Find the booking to get its title and room name for the notification
                 const booking = bookings.find(b => b.id === id);
                 const roomName = booking?.rooms?.name || "ประชุม";
 
@@ -198,12 +199,19 @@ const MyBookings = () => {
                             const endDate = new Date(booking.end_at);
                             const rejection = booking.reservation_approvals?.find((a: any) => a.decision === 'REJECTED');
 
-                            const handleCancel = async () => {
+                            const handleCancel = () => {
                                 showCustomAlert("ยืนยันการยกเลิก", "คุณต้องการยกเลิกรายการจองนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้", "confirm", { id: booking.id });
                             };
 
                             return (
-                                <div key={booking.id} className="p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                <div 
+                                    key={booking.id} 
+                                    className="p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
+                                    onClick={() => {
+                                        setActiveDetail(booking);
+                                        setDetailOpen(true);
+                                    }}
+                                >
                                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                                         <div className="space-y-2 flex-1">
                                             <div className="flex items-center gap-3">
@@ -259,20 +267,31 @@ const MyBookings = () => {
                                             <div className="mt-4 flex items-center gap-4">
                                                 {booking.status.toUpperCase() === 'PENDING' && (
                                                     <button
-                                                        onClick={handleCancel}
-                                                        className="text-xs font-semibold text-red-500 hover:text-red-700 dark:hover:text-red-400 flex items-center gap-1 transition-colors"
+                                                        onClick={(e) => { e.stopPropagation(); handleCancel(); }}
+                                                        className="text-xs font-semibold text-red-500 hover:text-red-700 dark:hover:text-red-400 flex items-center gap-1 transition-colors bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded"
                                                     >
                                                         ยกเลิกการจอง
                                                     </button>
                                                 )}
                                                 <button
-                                                    onClick={() => {
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
                                                         setActiveTimeline(booking);
                                                         setTimelineOpen(true);
                                                     }}
-                                                    className="text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400 flex items-center gap-1 transition-colors"
+                                                    className="text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400 flex items-center gap-1 transition-colors bg-primary-50 dark:bg-primary-900/20 px-2 py-1 rounded"
                                                 >
-                                                    ประวัติการอนุมัติ (Timeline)
+                                                    Timeline อนุมัติ
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setActiveDetail(booking);
+                                                        setDetailOpen(true);
+                                                    }}
+                                                    className="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 flex items-center gap-1 transition-colors bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded"
+                                                >
+                                                    <Info className="w-3 h-3" /> รายละเอียด
                                                 </button>
                                             </div>
                                         </div>
@@ -298,10 +317,97 @@ const MyBookings = () => {
                     </div>
                 )}
             </div>
-            {/* Custom Alert & Confirm Modal */}
+
+            {/* Booking Detail Modal */}
+            {detailOpen && activeDetail && (
+                <div className="fixed inset-0 z-[105] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300"
+                     onClick={(e) => {
+                         if (e.target === e.currentTarget) setDetailOpen(false);
+                     }}>
+                    <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-8 max-w-xl w-full shadow-2xl transform animate-in zoom-in-95 slide-in-from-bottom-5 duration-300 border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar">
+                        <div className="flex items-start justify-between mb-6">
+                            <div>
+                                <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">รายละเอียดการจอง</h3>
+                                <div className="mt-2">
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${getStatusColor(activeDetail.status)}`}>
+                                        {getStatusThai(activeDetail)}
+                                    </span>
+                                </div>
+                            </div>
+                            <button onClick={() => setDetailOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
+                                <X className="w-6 h-6 text-slate-500" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 gap-4">
+                                <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">ห้องที่จอง</div>
+                                    <div className="text-lg font-bold text-gray-900 dark:text-white">{(activeDetail as any).room?.name || 'ไม่ระบุห้อง'}</div>
+                                    <div className="text-sm text-slate-500">{(activeDetail as any).room?.location || 'ไม่ระบุสถานที่'}</div>
+                                </div>
+
+                                <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">หัวข้อและวัตถุประสงค์</div>
+                                    <div className="text-base font-bold text-gray-900 dark:text-white mb-2">{activeDetail.title}</div>
+                                    <div className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{activeDetail.purpose}</div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="bg-indigo-50 dark:bg-indigo-900/10 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-800/50">
+                                        <div className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-1">วันและเวลาใช้งานจริง</div>
+                                        <div className="text-sm font-bold text-indigo-900 dark:text-white mb-1">
+                                            {format(new Date(activeDetail.start_at), 'd MMM yyyy', { locale: th })} 
+                                            {format(new Date(activeDetail.start_at), 'd MMM yyyy') !== format(new Date(activeDetail.end_at), 'd MMM yyyy') && 
+                                                ` - ${format(new Date(activeDetail.end_at), 'd MMM yyyy', { locale: th })}`
+                                            }
+                                        </div>
+                                        <div className="text-xs text-indigo-700 dark:text-indigo-300">
+                                            {format(new Date(activeDetail.start_at), 'HH:mm')} - {format(new Date(activeDetail.end_at), 'HH:mm')} น.
+                                        </div>
+                                    </div>
+
+                                    {activeDetail.setup_start_at ? (
+                                        <div className="bg-yellow-50 dark:bg-yellow-900/10 p-4 rounded-2xl border border-yellow-100 dark:border-yellow-800/50">
+                                            <div className="text-[10px] font-black text-yellow-600 dark:text-yellow-400 uppercase tracking-widest mb-1">จัดเตรียมห้องล่วงหน้า</div>
+                                            <div className="text-sm font-bold text-yellow-900 dark:text-white mb-1">
+                                                {format(new Date(activeDetail.setup_start_at), 'd MMM yyyy', { locale: th })}
+                                                {activeDetail.setup_end_at && format(new Date(activeDetail.setup_start_at), 'd MMM yyyy') !== format(new Date(activeDetail.setup_end_at), 'd MMM yyyy') && 
+                                                    ` - ${format(new Date(activeDetail.setup_end_at), 'd MMM yyyy', { locale: th })}`
+                                                }
+                                            </div>
+                                            <div className="text-xs text-yellow-700 dark:text-yellow-300">
+                                                {format(new Date(activeDetail.setup_start_at), 'HH:mm')} - {activeDetail.setup_end_at ? format(new Date(activeDetail.setup_end_at), 'HH:mm') : 'เสร็จสิ้นก่อนเริ่มงาน'} น.
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 opacity-60">
+                                            <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">การจัดเตรียมห้องล่วงหน้า</div>
+                                            <div className="text-sm font-bold text-slate-500 dark:text-slate-400 mt-2">ไม่ต้องการเวลาจัดเตรียม</div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
+                            <button
+                                onClick={() => setDetailOpen(false)}
+                                className="px-6 py-3 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl font-bold transition-transform active:scale-95"
+                            >
+                                ปิด
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Timeline Modal */}
             {timelineOpen && activeTimeline && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300"
+                     onClick={(e) => {
+                         if (e.target === e.currentTarget) setTimelineOpen(false);
+                     }}>
                     <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 max-w-lg w-full shadow-2xl transform animate-in zoom-in-95 slide-in-from-bottom-10 duration-300 border border-white/20 dark:border-slate-800 flex flex-col max-h-[90vh]">
                         <div className="flex items-center justify-between mb-8">
                             <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Timeline การอนุมัติ</h3>
@@ -379,9 +485,10 @@ const MyBookings = () => {
                     </div>
                 </div>
             )}
+            
             {/* Custom Alert & Confirm Modal */}
             {alertOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
                     <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 max-w-sm w-full shadow-2xl transform animate-in zoom-in-95 slide-in-from-bottom-10 duration-300 border border-white/20 dark:border-slate-800">
                         <div className="flex flex-col items-center text-center">
                             <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-8 ${alertType === 'success' ? 'bg-emerald-100 text-emerald-600' :

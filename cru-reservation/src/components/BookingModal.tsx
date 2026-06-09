@@ -139,17 +139,25 @@ const BookingModal: React.FC<BookingModalProps> = ({
     onSuccess,
 }) => {
     /* ===== form state ===== */
-    const [eventRange, setEventRange] = useState<Range>({
-        key: "event",
+    const [useRange, setUseRange] = useState<Range>({
+        key: "use",
         startDate: initialDate ? startOfDay(new Date(initialDate)) : startOfDay(new Date()),
         endDate: initialDate ? startOfDay(new Date(initialDate)) : startOfDay(new Date()),
     });
 
+    const [setupRange, setSetupRange] = useState<Range>({
+        key: "setup",
+        startDate: initialDate ? startOfDay(new Date(initialDate)) : startOfDay(new Date()),
+        endDate: initialDate ? startOfDay(new Date(initialDate)) : startOfDay(new Date()),
+    });
+
+    const [active, setActive] = useState<"use" | "setup">("use");
+    const [needsSetup, setNeedsSetup] = useState(false);
+
+    const [setupStart, setSetupStart] = useState("08:00");
+    const [setupEnd, setSetupEnd] = useState(initialStartTime || "09:00");
     const [startTime, setStartTime] = useState(initialStartTime || "09:00");
     const [endTime, setEndTime] = useState(initialEndTime || "10:00");
-
-    const [needsSetup, setNeedsSetup] = useState(false);
-    const [setupStart, setSetupStart] = useState("08:00");
 
     const [title, setTitle] = useState("");
     const [purpose, setPurpose] = useState("");
@@ -163,21 +171,24 @@ const BookingModal: React.FC<BookingModalProps> = ({
     const [existingReservations, setExistingReservations] = useState<any[]>([]);
 
     // 📌 Draft Persistence Logic
-    const DRAFT_KEY = `mrs_draft_v2_${room.id}`;
+    const DRAFT_KEY = `mrs_draft_v3_${room.id}`;
 
     useEffect(() => {
         const saved = localStorage.getItem(DRAFT_KEY);
         if (saved) {
             try {
                 const draft = JSON.parse(saved);
-                if (draft.eventRange) setEventRange({ ...draft.eventRange, startDate: new Date(draft.eventRange.startDate), endDate: new Date(draft.eventRange.endDate) });
+                if (draft.useRange) setUseRange({ ...draft.useRange, startDate: new Date(draft.useRange.startDate), endDate: new Date(draft.useRange.endDate) });
+                if (draft.setupRange) setSetupRange({ ...draft.setupRange, startDate: new Date(draft.setupRange.startDate), endDate: new Date(draft.setupRange.endDate) });
+                if (draft.active) setActive(draft.active);
+                if (draft.needsSetup !== undefined) setNeedsSetup(draft.needsSetup);
                 if (draft.title) setTitle(draft.title);
                 if (draft.purpose) setPurpose(draft.purpose);
                 if (draft.guestCount) setGuestCount(draft.guestCount);
                 if (draft.startTime) setStartTime(draft.startTime);
                 if (draft.endTime) setEndTime(draft.endTime);
-                if (draft.needsSetup !== undefined) setNeedsSetup(draft.needsSetup);
                 if (draft.setupStart) setSetupStart(draft.setupStart);
+                if (draft.setupEnd) setSetupEnd(draft.setupEnd);
                 if (draft.isCustomGuest) setIsCustomGuest(draft.isCustomGuest);
                 if (draft.step) setStep(draft.step);
             } catch (e) {
@@ -188,19 +199,22 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
     useEffect(() => {
         const payload = {
-            eventRange,
+            useRange,
+            setupRange,
+            active,
+            needsSetup,
             title,
             purpose,
             guestCount,
             startTime,
             endTime,
-            needsSetup,
             setupStart,
+            setupEnd,
             isCustomGuest,
             step
         };
         localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
-    }, [DRAFT_KEY, eventRange, title, purpose, guestCount, startTime, endTime, needsSetup, setupStart, isCustomGuest, step]);
+    }, [DRAFT_KEY, useRange, setupRange, active, needsSetup, title, purpose, guestCount, startTime, endTime, setupStart, setupEnd, isCustomGuest, step]);
 
     // Custom Alert Modal
     const [alertOpen, setAlertOpen] = useState(false);
@@ -240,32 +254,21 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
     const busyDateStrings = useMemo(() => new Set(reservationMap.keys()), [reservationMap]);
 
-    const eventStartDate = eventRange.startDate ?? new Date();
-    const eventEndDate = eventRange.endDate ?? eventStartDate;
-    const labelEvent = useMemo(() => fmtRange(eventStartDate, eventEndDate), [eventStartDate, eventEndDate]);
+    const useStart = useRange.startDate ?? new Date();
+    const useEnd = useRange.endDate ?? useStart;
+    const labelUse = useMemo(() => fmtRange(useStart, useEnd), [useStart, useEnd]);
+
+    const setupStartDate = setupRange.startDate ?? new Date();
+    const setupEndDate = setupRange.endDate ?? setupStartDate;
+    const labelSetup = useMemo(() => fmtRange(setupStartDate, setupEndDate), [setupStartDate, setupEndDate]);
 
     const handleSelect = (ranges: RangeKeyDict) => {
-        const { event } = ranges;
-        if (!event?.startDate || !event?.endDate) return;
+        const { use, setup } = ranges;
+        const target = active === "use" ? use : setup;
+        const setter = active === "use" ? setUseRange : setSetupRange;
 
-        const start = dayjs(event.startDate).startOf('day');
-        const end = dayjs(event.endDate).startOf('day');
-        const currStart = dayjs(eventRange.startDate).startOf('day');
-        const currEnd = dayjs(eventRange.endDate).startOf('day');
-
-        // Logic 1: Click same date twice when it's just a single day -> Reset
-        if (currStart.isSame(currEnd, 'day') && start.isSame(currStart, 'day') && end.isSame(currStart, 'day')) {
-            setEventRange({ key: "event", startDate: startOfDay(new Date()), endDate: startOfDay(new Date()) });
-            return;
-        }
-
-        // Logic 2: Reset on new click after range formed
-        if (!currStart.isSame(currEnd, 'day') && start.isSame(end, 'day')) {
-            setEventRange({ key: "event", startDate: event.startDate, endDate: event.startDate });
-            return;
-        }
-
-        setEventRange({ key: "event", startDate: event.startDate, endDate: event.endDate });
+        if (!target?.startDate || !target?.endDate) return;
+        setter({ key: active, startDate: target.startDate, endDate: target.endDate });
     };
 
     const fetchExisting = async () => {
@@ -294,27 +297,46 @@ const BookingModal: React.FC<BookingModalProps> = ({
     }, [onClose]);
 
     const hasConflict = useMemo(() => {
-        const start = dayjs(buildISO(eventStartDate, needsSetup ? setupStart : startTime));
-        const end = dayjs(buildISO(eventEndDate, endTime, true));
+        // Event Conflict
+        const startE = dayjs(buildISO(useStart, startTime));
+        const endE = dayjs(buildISO(useEnd, endTime, true));
+
+        // Setup Conflict
+        const startS = needsSetup ? dayjs(buildISO(setupStartDate, setupStart)) : null;
+        const endS = needsSetup ? dayjs(buildISO(setupEndDate, setupEnd, true)) : null;
 
         return existingReservations.some(r => {
-            const rStart = dayjs(r.setup_start_at || r.start_at);
+            const rStart = dayjs(r.start_at);
             const rEnd = dayjs(r.end_at);
-            return start.isBefore(rEnd) && end.isAfter(rStart);
+            const rSetupStart = r.setup_start_at ? dayjs(r.setup_start_at) : rStart;
+
+            const useConflict = startE.isBefore(rEnd) && endE.isAfter(rSetupStart);
+            const setupConflict = needsSetup && startS!.isBefore(rEnd) && endS!.isAfter(rSetupStart);
+
+            return useConflict || setupConflict;
         });
-    }, [eventStartDate, eventEndDate, startTime, endTime, needsSetup, setupStart, existingReservations]);
+    }, [useStart, useEnd, startTime, endTime, needsSetup, setupStartDate, setupEndDate, setupStart, setupEnd, existingReservations]);
 
     const validateStep = (s: number) => {
         if (s === 1) {
             const useS = timeToMinutes(startTime);
             const useE = timeToMinutes(endTime);
             if (!Number.isFinite(useS) || !Number.isFinite(useE)) return "เวลาใช้งานไม่ถูกต้อง";
-            if (useS >= useE) return "เวลาใช้งาน: เวลาเริ่มต้องน้อยกว่าเวลาสิ้นสุด";
+            if (dayjs(useStart).isSame(dayjs(useEnd), 'day') && useS >= useE) return "เวลาใช้งาน: เวลาเริ่มต้องน้อยกว่าเวลาสิ้นสุดในวันเดียวกัน";
 
             if (needsSetup) {
                 const setS = timeToMinutes(setupStart);
-                if (!Number.isFinite(setS)) return "เวลาจัดเตรียมไม่ถูกต้อง";
-                if (setS >= useS) return "เวลาเริ่มจัดเตรียมห้อง ต้องมาก่อนเวลาเริ่มใช้งานจริง";
+                const setE = timeToMinutes(setupEnd);
+                if (!Number.isFinite(setS) || !Number.isFinite(setE)) return "เวลาจัดเตรียมไม่ถูกต้อง";
+                if (dayjs(setupStartDate).isSame(dayjs(setupEndDate), 'day') && setS >= setE) return "เวลาจัดเตรียม: เวลาเริ่มต้องน้อยกว่าเวลาสิ้นสุดในวันเดียวกัน";
+
+                // Validation: Setup must finish before or exactly when event starts
+                const endOfSetup = dayjs(buildISO(setupEndDate, setupEnd, true));
+                const startOfEvent = dayjs(buildISO(useStart, startTime));
+                
+                if (endOfSetup.isAfter(startOfEvent)) {
+                    return "เวลาจัดเตรียมห้องต้องเสร็จสิ้นก่อนเริ่มงานจริง";
+                }
             }
 
             if (hasConflict) return "ช่วงเวลานี้ถูกจองไปแล้ว กรุณาเลือกเวลาอื่น";
@@ -359,15 +381,14 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     guestCount > 1 ? `\n(จำนวนผู้เข้าร่วม: ${guestCount} คน)` : "",
                 ].filter(Boolean).join("\n"),
 
-                start_at: buildISO(eventStartDate, startTime),
-                end_at: buildISO(eventEndDate, endTime, true),
+                start_at: buildISO(useStart, startTime),
+                end_at: buildISO(useEnd, endTime, true),
 
-                // Setup time logic
-                setup_date: needsSetup ? dayjs(eventStartDate).tz("Asia/Bangkok").format("YYYY-MM-DD") : null,
+                setup_date: needsSetup ? dayjs(setupStartDate).tz("Asia/Bangkok").format("YYYY-MM-DD") : null,
                 setup_start: needsSetup ? setupStart : null,
-                setup_end: needsSetup ? startTime : null, // Implicitly ends when event starts
-                setup_start_at: needsSetup ? buildISO(eventStartDate, setupStart) : null,
-                setup_end_at: needsSetup ? buildISO(eventStartDate, startTime) : null,
+                setup_end: needsSetup ? setupEnd : null,
+                setup_start_at: needsSetup ? buildISO(setupStartDate, setupStart) : null,
+                setup_end_at: needsSetup ? buildISO(setupEndDate, setupEnd, true) : null,
 
                 status: "PENDING",
                 current_stage: 1
@@ -421,7 +442,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 if (e.target === e.currentTarget) onClose();
             }}
         >
-            <div className="w-full max-w-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20 dark:border-slate-800/50 flex flex-col max-h-[95dvh] sm:max-h-[90vh] animate-in zoom-in-95 duration-300">
+            <div className="w-full max-w-4xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20 dark:border-slate-800/50 flex flex-col max-h-[95dvh] sm:max-h-[90vh] animate-in zoom-in-95 duration-300">
                 <div className="bg-slate-50 dark:bg-slate-950 px-5 py-5 relative border-b border-slate-100 dark:border-white/5">
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
@@ -444,7 +465,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 </div>
 
                 <div className="px-8 pt-4 pb-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 max-w-2xl mx-auto">
                         {[1, 2, 3].map((s) => (
                             <div key={s} className="flex-1 flex flex-col gap-1.5">
                                 <div className={`h-1.5 rounded-full transition-all duration-500 ${step >= s ? "bg-indigo-600" : "bg-slate-200 dark:bg-slate-800"}`} />
@@ -464,113 +485,122 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
                 <div className="flex flex-col gap-6 px-5 sm:px-8 py-6 sm:py-8 overflow-y-auto custom-scrollbar flex-1">
                     {step === 1 && (
-                        <div className="animate-in slide-in-from-right-4 duration-300 space-y-6">
-                            {/* Calendar */}
-                            <div className="mx-auto w-full max-w-[520px] bg-slate-50/50 dark:bg-slate-800/20 rounded-3xl p-4 border border-slate-100 dark:border-slate-700/30 overflow-hidden flex flex-col items-center shadow-sm">
-                                <div className="w-full flex justify-center transform scale-100 origin-top mb-4 rounded-2xl overflow-hidden shadow-sm">
-                                    <DateRange
-                                        locale={th}
-                                        ranges={[eventRange]}
-                                        onChange={handleSelect}
-                                        focusedRange={[0, 0]}
-                                        disabledDates={[...Array.from(busyDateStrings).map(s => dayjs(s).toDate())]}
-                                        minDate={startOfDay(new Date())}
-                                        months={1}
-                                        direction="vertical"
-                                        showDateDisplay={false}
-                                        rangeColors={["#4f46e5"]}
-                                        // @ts-ignore
-                                        moveRangeOnFirstSelection={false}
-                                        // @ts-ignore
-                                        dragSelectionEnabled={false}
-                                        // @ts-ignore
-                                        preventSnapRefocus={true}
-                                        dayContentRenderer={(day: Date) => {
-                                            const dateStr = dayjs(day).format("YYYY-MM-DD");
-                                            const res = reservationMap.get(dateStr);
-                                            const isBusy = !!res;
-
-                                            return (
-                                                <div className="relative w-full h-full flex flex-col items-center justify-center pointer-events-none">
-                                                    <span className={`text-xs font-black transition-all ${isBusy ? "text-slate-300 dark:text-slate-600" : "text-slate-700 dark:text-slate-200"}`}>
-                                                        {day.getDate()}
-                                                    </span>
-                                                    {isBusy && (
-                                                        <div className="absolute bottom-1.5 w-4 h-[2px] bg-red-500 rounded-full shadow-sm shadow-red-200" />
-                                                    )}
-                                                </div>
-                                            );
-                                        }}
-                                    />
-                                </div>
-
-                                <div className="w-full flex justify-center gap-4 mb-3 border-b border-slate-100 dark:border-slate-800 pb-3">
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-2.5 h-2.5 rounded-full bg-indigo-600 shadow-sm" />
-                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">วันใช้งานจริง</span>
+                        <div className="animate-in slide-in-from-right-4 duration-300">
+                            <div className="flex flex-col md:flex-row gap-8">
+                                {/* Calendar Column */}
+                                <div className="flex-1 max-w-[420px] mx-auto w-full bg-slate-50/50 dark:bg-slate-800/20 rounded-3xl p-4 border border-slate-100 dark:border-slate-700/30 overflow-hidden flex flex-col items-center shadow-sm">
+                                    <div className="grid grid-cols-2 p-1 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl mb-4 w-full max-w-[280px]">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setNeedsSetup(true); setActive("setup"); }}
+                                            className={`py-2 rounded-lg text-sm font-black transition-all ${active === "setup" && needsSetup ? "bg-white dark:bg-slate-800 text-yellow-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                                        >
+                                            จัดเตรียม
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setActive("use")}
+                                            className={`py-2 rounded-lg text-sm font-black transition-all ${active === "use" ? "bg-white dark:bg-slate-800 text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
+                                        >
+                                            วันใช้จริง
+                                        </button>
                                     </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-sm" />
-                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">จองแล้ว</span>
-                                    </div>
-                                </div>
+                                    <div className="w-full flex justify-center transform scale-100 origin-top mb-4 rounded-2xl overflow-hidden shadow-sm">
+                                        <DateRange
+                                            locale={th}
+                                            ranges={active === "use" ? [useRange, setupRange] : [setupRange, useRange]}
+                                            onChange={handleSelect}
+                                            focusedRange={[0, 0]}
+                                            disabledDates={[...Array.from(busyDateStrings).map(s => dayjs(s).toDate())]}
+                                            minDate={startOfDay(new Date())}
+                                            months={1}
+                                            direction="vertical"
+                                            showDateDisplay={false}
+                                            rangeColors={active === "use" ? ["#4f46e5", "#f59e0b"] : ["#f59e0b", "#4f46e5"]}
+                                            dragSelectionEnabled={true}
+                                            // @ts-ignore
+                                            preventSnapRefocus={true}
+                                            dayContentRenderer={(day: Date) => {
+                                                const dateStr = dayjs(day).format("YYYY-MM-DD");
+                                                const res = reservationMap.get(dateStr);
+                                                const isBusy = !!res;
 
-                                <div className="w-full text-center py-2.5 text-sm border-t border-slate-100 dark:border-slate-800 mt-1 bg-white dark:bg-slate-900/50 rounded-xl shadow-sm">
-                                    <span className="font-black text-slate-800 dark:text-white uppercase tracking-wider text-sm">
-                                        {labelEvent}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Time Pickers & Setup Toggle */}
-                            <div className="space-y-4">
-                                <div className="bg-indigo-50/40 dark:bg-indigo-900/5 border border-indigo-100 dark:border-indigo-900/20 rounded-2xl p-4 flex flex-col gap-3">
-                                    <div className="text-[10px] font-black text-indigo-600 uppercase tracking-widest text-center">เวลาใช้งานจริง</div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <CustomTimePicker value={startTime} onChange={setStartTime} label="เข้า" colorClass="indigo" />
-                                        <CustomTimePicker value={endTime} onChange={setEndTime} label="ออก" colorClass="indigo" />
-                                    </div>
-                                </div>
-
-                                <div className={`border rounded-2xl p-4 transition-colors ${needsSetup ? "bg-yellow-50/40 dark:bg-yellow-900/5 border-yellow-200" : "bg-slate-50 border-slate-200"}`}>
-                                    <label className="flex items-center gap-3 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500"
-                                            checked={needsSetup}
-                                            onChange={(e) => setNeedsSetup(e.target.checked)}
+                                                return (
+                                                    <div className="relative w-full h-full flex flex-col items-center justify-center pointer-events-none">
+                                                        <span className={`text-xs font-black transition-all ${isBusy ? "text-slate-300 dark:text-slate-600" : "text-slate-700 dark:text-slate-200"}`}>
+                                                            {day.getDate()}
+                                                        </span>
+                                                        {isBusy && (
+                                                            <div className="absolute bottom-1.5 w-4 h-[2px] bg-red-500 rounded-full shadow-sm shadow-red-200" />
+                                                        )}
+                                                    </div>
+                                                );
+                                            }}
                                         />
-                                        <span className={`text-sm font-bold ${needsSetup ? "text-yellow-700" : "text-slate-600"}`}>
-                                            ต้องการเวลาจัดเตรียมห้องล่วงหน้า
-                                        </span>
-                                    </label>
+                                    </div>
+
+                                    <div className="w-full text-center py-2 text-xs border-t border-slate-100 dark:border-slate-800 mt-1 bg-white dark:bg-slate-900/50 rounded-xl shadow-sm text-slate-500">
+                                        💡 สามารถคลิกลากเพื่อเลือกแบบหลายวันติดกันได้
+                                    </div>
+                                </div>
+
+                                {/* Time Selection Column */}
+                                <div className="flex-[0.8] flex flex-col gap-6 w-full">
+                                    <div className="bg-indigo-50/40 dark:bg-indigo-900/5 border border-indigo-100 dark:border-indigo-900/20 rounded-2xl p-5 flex flex-col gap-4 shadow-sm">
+                                        <div className="flex flex-col gap-1 items-center border-b border-indigo-100/50 pb-3">
+                                            <div className="text-xs font-black text-indigo-600 uppercase tracking-widest text-center">เวลาใช้งานจริง</div>
+                                            <div className="text-sm font-bold text-slate-800 dark:text-white">{labelUse}</div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <CustomTimePicker value={startTime} onChange={setStartTime} label="เข้า" colorClass="indigo" />
+                                            <CustomTimePicker value={endTime} onChange={setEndTime} label="ออก" colorClass="indigo" />
+                                        </div>
+                                    </div>
+
+                                    <div className={`rounded-2xl p-5 flex flex-col gap-4 transition-all shadow-sm border ${needsSetup ? "bg-yellow-50/40 dark:bg-yellow-900/5 border-yellow-200" : "bg-slate-50 border-slate-200"}`}>
+                                        <div className="flex items-center justify-between border-b border-yellow-100/50 pb-3">
+                                            <div className="flex flex-col gap-1">
+                                                <div className="text-xs font-black text-yellow-600 uppercase tracking-widest">การเตรียมห้องล่วงหน้า</div>
+                                                {needsSetup && <div className="text-sm font-bold text-slate-800 dark:text-white">{labelSetup}</div>}
+                                            </div>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="sr-only peer"
+                                                    checked={needsSetup}
+                                                    onChange={(e) => {
+                                                        setNeedsSetup(e.target.checked);
+                                                        if (e.target.checked && active !== "setup") {
+                                                            setActive("setup");
+                                                        }
+                                                    }}
+                                                />
+                                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-yellow-500"></div>
+                                            </label>
+                                        </div>
+                                        <div className={`grid grid-cols-2 gap-4 transition-all duration-300 ${needsSetup ? "opacity-100" : "opacity-30 pointer-events-none"}`}>
+                                            <CustomTimePicker value={setupStart} onChange={setSetupStart} label="เริ่มเตรียม" colorClass="yellow" />
+                                            <CustomTimePicker value={setupEnd} onChange={setSetupEnd} label="สิ้นสุด" colorClass="yellow" />
+                                        </div>
+                                        {needsSetup && (
+                                            <div className="text-xs text-yellow-600/80 font-medium text-center bg-yellow-100/30 p-2 rounded-lg">
+                                                * ควรเลือกเวลาที่เสร็จสิ้นก่อนเริ่มกิจกรรมจริง
+                                            </div>
+                                        )}
+                                    </div>
                                     
-                                    {needsSetup && (
-                                        <div className="mt-4 pt-4 border-t border-yellow-100 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
-                                            <div className="flex-1">
-                                                <div className="text-xs font-bold text-yellow-600 mb-2">เวลาเริ่มจัดเตรียมห้อง</div>
-                                                <div className="w-32">
-                                                    <CustomTimePicker value={setupStart} onChange={setSetupStart} label="เริ่มจัดเตรียม" colorClass="yellow" />
-                                                </div>
-                                            </div>
-                                            <div className="text-xs text-yellow-600/70 font-medium text-right ml-4">
-                                                * เวลาจัดเตรียมจะสิ้นสุดเมื่อ <br/> การใช้งานจริงเริ่มต้น ({startTime} น.)
-                                            </div>
+                                    {hasConflict && (
+                                        <div className="p-3 bg-red-50 text-red-600 text-center font-bold rounded-2xl border border-red-100 animate-pulse text-sm">
+                                            ⚠️ ช่วงเวลานี้ถูกจองไปแล้ว
                                         </div>
                                     )}
                                 </div>
                             </div>
-
-                            {hasConflict && (
-                                <div className="p-3 bg-red-50 text-red-600 text-center font-bold rounded-2xl border border-red-100 animate-pulse text-sm">
-                                    ⚠️ ช่วงเวลานี้ถูกจองไปแล้ว
-                                </div>
-                            )}
                         </div>
                     )}
 
                     {step === 2 && (
-                        <div className="animate-in slide-in-from-right-4 duration-300 space-y-6">
+                        <div className="animate-in slide-in-from-right-4 duration-300 max-w-2xl mx-auto w-full space-y-6">
                             <div className="space-y-5">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">หัวข้อการจอง</label>
@@ -636,7 +666,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     )}
 
                     {step === 3 && (
-                        <div className="animate-in slide-in-from-right-4 duration-300">
+                        <div className="animate-in slide-in-from-right-4 duration-300 max-w-2xl mx-auto w-full">
                             <div className="bg-slate-50 dark:bg-slate-800/40 rounded-3xl p-5 space-y-4 border border-slate-100 dark:border-slate-700/50">
                                 <div className="text-center mb-2">
                                     <h3 className="text-lg font-black text-slate-900 dark:text-white mb-0.5">สรุปข้อมูลการจอง</h3>
@@ -652,14 +682,14 @@ const BookingModal: React.FC<BookingModalProps> = ({
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <div className="flex flex-col gap-0.5 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-indigo-100 dark:border-indigo-900/30">
                                             <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest">วันและเวลาใช้งานจริง</span>
-                                            <span className="text-sm font-bold dark:text-white">{labelEvent}</span>
+                                            <span className="text-sm font-bold dark:text-white">{labelUse}</span>
                                             <span className="text-[10px] font-medium text-slate-500">{startTime} - {endTime} น.</span>
                                         </div>
                                         {needsSetup ? (
                                             <div className="flex flex-col gap-0.5 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-yellow-200 dark:border-yellow-900/30">
                                                 <span className="text-[8px] font-black text-yellow-600 uppercase tracking-widest">จัดเตรียมห้องล่วงหน้า</span>
-                                                <span className="text-sm font-bold dark:text-white">เริ่มต้นเวลา {setupStart} น.</span>
-                                                <span className="text-[10px] font-medium text-slate-500">ในวันเดียวกับที่จัดงาน</span>
+                                                <span className="text-sm font-bold dark:text-white">{labelSetup}</span>
+                                                <span className="text-[10px] font-medium text-slate-500">{setupStart} - {setupEnd} น.</span>
                                             </div>
                                         ) : (
                                             <div className="flex flex-col gap-0.5 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 opacity-60">
