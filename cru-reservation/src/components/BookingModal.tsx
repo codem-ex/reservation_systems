@@ -171,14 +171,33 @@ const BookingModal: React.FC<BookingModalProps> = ({
     const [showSuccess, setShowSuccess] = useState(false);
     const [existingReservations, setExistingReservations] = useState<any[]>([]);
 
-    // Sync same-day setup range with use range start date
+    // Sync setup range with use range start date
     useEffect(() => {
-        if (setupType === "same_day" && useRange.startDate) {
+        if (!useRange.startDate) return;
+
+        const isToday = dayjs(useRange.startDate).isSame(dayjs(), 'day');
+        if (isToday && setupType === "diff_day") {
+            setSetupType("same_day");
+            return;
+        }
+
+        if (setupType === "same_day") {
             setSetupRange({
                 key: "setup",
                 startDate: useRange.startDate,
                 endDate: useRange.startDate
             });
+        } else if (setupType === "diff_day") {
+            // Ensure diff_day setup is at least 1 day before the event
+            const prevDay = startOfDay(dayjs(useRange.startDate).subtract(1, 'day').toDate());
+            // Only update if current setup date is on or after event date, or not set
+            if (!setupRange.startDate || dayjs(setupRange.startDate).isAfter(prevDay) || dayjs(setupRange.startDate).isSame(useRange.startDate, 'day')) {
+                setSetupRange({
+                    key: "setup",
+                    startDate: prevDay,
+                    endDate: prevDay
+                });
+            }
         }
     }, [useRange.startDate, setupType]);
 
@@ -351,6 +370,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 const setE = timeToMinutes(setupEnd);
                 if (!Number.isFinite(setS) || !Number.isFinite(setE)) return "เวลาจัดเตรียมไม่ถูกต้อง";
                 if (dayjs(setupStartDate).isSame(dayjs(setupEndDate), 'day') && setS >= setE) return "เวลาจัดเตรียม: เวลาเริ่มต้องน้อยกว่าเวลาสิ้นสุดในวันเดียวกัน";
+                if (setupType === "diff_day" && !dayjs(setupStartDate).isBefore(dayjs(useStart), 'day')) return "วันจัดเตรียมห้องต้องเกิดขึ้นก่อนวันเริ่มงานจริงอย่างน้อย 1 วัน";
                 if (dayjs(setupStartDate).isAfter(dayjs(useStart), 'day')) return "วันจัดเตรียมห้องต้องไม่เกิดขึ้นหลังวันเริ่มงานจริง";
 
                 // Validation: Setup must finish before or exactly when event starts
@@ -458,8 +478,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
         }
     };
     const todayStr = dayjs().format("YYYY-MM-DD");
-    const eventStartStr = useRange.startDate ? dayjs(useRange.startDate).format("YYYY-MM-DD") : "";
     const setupDateStr = setupRange.startDate ? dayjs(setupRange.startDate).format("YYYY-MM-DD") : "";
+    const maxSetupDateStr = useRange.startDate ? dayjs(useRange.startDate).subtract(1, 'day').format("YYYY-MM-DD") : "";
+    const isDiffDayDisabled = !useRange.startDate || dayjs(useRange.startDate).isSame(dayjs(), 'day');
 
     const handleSetupDateChange = (val: string) => {
         if (!val) return;
@@ -605,11 +626,21 @@ const BookingModal: React.FC<BookingModalProps> = ({
                                             {/* Option 3: Different Day */}
                                             <button
                                                 type="button"
+                                                disabled={isDiffDayDisabled}
                                                 onClick={() => setSetupType("diff_day")}
-                                                className={`flex flex-col items-start p-3.5 rounded-2xl border-2 text-left transition-all ${setupType === "diff_day" ? "border-yellow-500 bg-yellow-50/20 dark:bg-yellow-950/20" : "border-slate-200 dark:border-slate-800 hover:border-slate-300 bg-white dark:bg-slate-900/50"}`}
+                                                className={`flex flex-col items-start p-3.5 rounded-2xl border-2 text-left transition-all ${isDiffDayDisabled 
+                                                    ? "opacity-50 cursor-not-allowed bg-slate-50 dark:bg-slate-900/20 border-slate-200 dark:border-slate-800" 
+                                                    : setupType === "diff_day" 
+                                                        ? "border-yellow-500 bg-yellow-50/20 dark:bg-yellow-950/20 cursor-pointer" 
+                                                        : "border-slate-200 dark:border-slate-800 hover:border-slate-300 bg-white dark:bg-slate-900/50 cursor-pointer"
+                                                }`}
                                             >
                                                 <span className="text-sm font-bold text-slate-900 dark:text-white">ระบุวันจัดเตรียมอื่นแยกต่างหาก</span>
-                                                <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">จองเพื่อจัดเตรียมห้องข้ามวัน (เช่น จัดล่วงหน้า 1 วัน)</span>
+                                                <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                                    {isDiffDayDisabled 
+                                                        ? "ไม่สามารถเลือกได้เนื่องจากวันจัดงานจริงเป็นวันนี้ (ต้องเตรียมวันเดียวกัน)" 
+                                                        : "จองเพื่อจัดเตรียมห้องข้ามวัน (เช่น จัดล่วงหน้า 1 วัน)"}
+                                                </span>
                                             </button>
                                         </div>
 
@@ -627,7 +658,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                                                             value={setupDateStr}
                                                             onChange={(e) => handleSetupDateChange(e.target.value)}
                                                             min={todayStr}
-                                                            max={eventStartStr}
+                                                            max={maxSetupDateStr}
                                                             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm font-bold dark:text-white focus:border-indigo-500 outline-none transition-all shadow-sm"
                                                         />
                                                     </div>
